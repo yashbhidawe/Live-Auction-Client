@@ -22,7 +22,7 @@ async function requestPermissions(): Promise<boolean> {
   return true;
 }
 
-export function useAgora(role: AgoraRole) {
+export function useAgora(role: AgoraRole, channelName?: string) {
   const [joined, setJoined] = useState(false);
   const [remoteUid, setRemoteUid] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -37,7 +37,13 @@ export function useAgora(role: AgoraRole) {
       setError("Video only in native app (dev client)");
       return;
     }
+    const channel = channelName ?? AGORA_CHANNEL;
+    if (!channel) {
+      setError("Channel name required");
+      return;
+    }
     setError(null);
+    setRemoteUid(null);
     try {
       const hasPerms = await requestPermissions();
       if (!hasPerms) {
@@ -54,34 +60,37 @@ export function useAgora(role: AgoraRole) {
       const { ChannelProfileType, ClientRoleType } =
         await import("react-native-agora");
 
-      const token = await fetchAgoraToken(AGORA_CHANNEL, uidRef.current, role);
-      const engine = createAgoraRtcEngine();
+      let engine = engineRef.current;
+      const isRejoin = engine != null;
 
-      const ctx = new RtcEngineContext();
-      ctx.appId = appId;
-      ctx.channelProfile = ChannelProfileType.ChannelProfileLiveBroadcasting;
-      engine.initialize(ctx);
+      if (!engine) {
+        engine = createAgoraRtcEngine();
+        const ctx = new RtcEngineContext();
+        ctx.appId = appId;
+        ctx.channelProfile = ChannelProfileType.ChannelProfileLiveBroadcasting;
+        engine.initialize(ctx);
+        engine.enableVideo();
+        engine.enableAudio();
+        engine.registerEventHandler({
+          onJoinChannelSuccess: (_conn: unknown, uid: number) => {
+            console.log("[useAgora] joined channel", channel, "uid", uid);
+            setJoined(true);
+          },
+          onUserJoined: (_conn: unknown, u: number) => {
+            console.log("[useAgora] remote user joined:", u);
+            setRemoteUid(u);
+          },
+          onUserOffline: (_conn: unknown, _uid: number, _reason: number) => {
+            console.log("[useAgora] remote user left");
+            setRemoteUid(null);
+          },
+          onError: (err: number, msg?: string) =>
+            setError(msg ?? `Error ${err}`),
+        });
+        engineRef.current = engine;
+      }
 
-      // Enable the video module (needed for both sending and receiving)
-      engine.enableVideo();
-      engine.enableAudio();
-
-      engine.registerEventHandler({
-        onJoinChannelSuccess: () => {
-          console.log("[useAgora] joined channel");
-          setJoined(true);
-        },
-        onUserJoined: (_conn: unknown, u: number) => {
-          console.log("[useAgora] remote user joined:", u);
-          setRemoteUid(u);
-        },
-        onUserOffline: () => {
-          console.log("[useAgora] remote user left");
-          setRemoteUid(null);
-        },
-        onError: (err: number, msg?: string) => setError(msg ?? `Error ${err}`),
-      });
-
+      const token = await fetchAgoraToken(channel, uidRef.current, role);
       const options = new ChannelMediaOptions();
       options.clientRoleType =
         role === "seller"
@@ -92,25 +101,25 @@ export function useAgora(role: AgoraRole) {
       options.autoSubscribeAudio = true;
       options.autoSubscribeVideo = true;
 
-      engine.joinChannel(token, AGORA_CHANNEL, uidRef.current, options);
+      if (isRejoin) {
+        engine.leaveChannel();
+      }
+      engine.joinChannel(token, channel, uidRef.current, options);
 
       if (role === "seller") {
         engine.startPreview();
       }
-
-      engineRef.current = engine;
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       console.warn("[useAgora] join failed:", msg, e);
       setError(msg);
     }
-  }, [role]);
+  }, [role, channelName]);
 
   const leave = useCallback(() => {
     if (engineRef.current) {
       engineRef.current.leaveChannel();
-      engineRef.current.release();
-      engineRef.current = null;
+      // Do not release() - singleton engine is reused so buyer can stay in channel and see seller when they join
     }
     setJoined(false);
     setRemoteUid(null);
@@ -125,6 +134,6 @@ export function useAgora(role: AgoraRole) {
     join,
     leave,
     uid: uidRef.current,
-    channel: AGORA_CHANNEL,
+    channel: channelName ?? AGORA_CHANNEL,
   };
 }

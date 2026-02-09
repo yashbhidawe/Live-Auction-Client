@@ -6,6 +6,7 @@ type AgoraVideoProps = {
   joined: boolean;
   remoteUid: number | null;
   uid: number;
+  channelId?: string;
 };
 
 /**
@@ -50,7 +51,10 @@ export function AgoraVideo({ role, joined, remoteUid, uid }: AgoraVideoProps) {
         {role === "buyer" && remoteUid != null && (
           <View style={styles.video}>
             <RtcSurfaceView
-              canvas={{ uid: remoteUid }}
+              canvas={{
+                uid: remoteUid,
+                ...(channelId ? { channelId } : {}),
+              }}
               style={StyleSheet.absoluteFill}
             />
             <View style={styles.badge}>
