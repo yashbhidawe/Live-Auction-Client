@@ -5,7 +5,8 @@ import { useAuctionSocket } from "@/lib/useAuctionSocket";
 const BID_STEP = 10;
 
 export default function HomeScreen() {
-  const { auctionState, bidResult, connected, placeBid } = useAuctionSocket();
+  const { auctionState, bidResult, connected, connectionError, placeBid } =
+    useAuctionSocket();
   const [userId] = useState(
     () => `user-${Math.random().toString(36).slice(2, 8)}`,
   );
@@ -20,9 +21,22 @@ export default function HomeScreen() {
           className={`h-2 w-2 rounded-full ${connected ? "bg-accent" : "bg-muted"}`}
         />
         <Text className="text-muted text-sm">
-          {connected ? "Connected" : "Connecting…"}
+          {connected
+            ? "Connected"
+            : connectionError
+              ? "Disconnected"
+              : "Connecting…"}
         </Text>
       </View>
+      {connectionError && (
+        <View className="mb-4 rounded-lg border border-danger/50 bg-danger/10 p-3">
+          <Text className="text-danger text-sm">{connectionError}</Text>
+          <Text className="text-muted mt-1 text-xs">
+            On device? Set EXPO_PUBLIC_SOCKET_URL to your machine IP (e.g.
+            http://192.168.1.x:3000) in client/.env
+          </Text>
+        </View>
+      )}
 
       <View className="rounded-xl bg-surface p-5">
         <Text className="text-muted text-xs uppercase tracking-wider">

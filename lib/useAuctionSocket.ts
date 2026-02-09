@@ -13,28 +13,34 @@ export function useAuctionSocket() {
   });
   const [bidResult, setBidResult] = useState<BidResult | null>(null);
   const [connected, setConnected] = useState(false);
+  const [connectionError, setConnectionError] = useState<string | null>(null);
 
   useEffect(() => {
     const s = getAuctionSocket();
     socketRef.current = s;
 
-    const onConnect = () => setConnected(true);
+    const onConnect = () => {
+      setConnected(true);
+      setConnectionError(null);
+    };
     const onDisconnect = () => setConnected(false);
+    const onConnectError = (err: Error) =>
+      setConnectionError(err?.message ?? "Connection failed");
     const onAuctionState = (state: AuctionState) => setAuctionState(state);
     const onBidResult = (result: BidResult) => setBidResult(result);
 
     s.on("connect", onConnect);
     s.on("disconnect", onDisconnect);
+    s.on("connect_error", onConnectError);
     s.on("auction_state", onAuctionState);
     s.on("bid_result", onBidResult);
 
-    if (s.connected) {
-      setConnected(true);
-    }
+    if (s.connected) setConnected(true);
 
     return () => {
       s.off("connect", onConnect);
       s.off("disconnect", onDisconnect);
+      s.off("connect_error", onConnectError);
       s.off("auction_state", onAuctionState);
       s.off("bid_result", onBidResult);
     };
@@ -45,5 +51,5 @@ export function useAuctionSocket() {
     socketRef.current?.emit("place_bid", { userId, amount });
   };
 
-  return { auctionState, bidResult, connected, placeBid };
+  return { auctionState, bidResult, connected, connectionError, placeBid };
 }
