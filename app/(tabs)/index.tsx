@@ -1,5 +1,8 @@
 import { useState } from "react";
-import { Text, View, Pressable } from "react-native";
+import { Text, View, Pressable, ScrollView } from "react-native";
+import { AgoraVideo } from "@/components/AgoraVideo";
+import type { AgoraRole } from "@/lib/agora";
+import { useAgora } from "@/lib/useAgora";
 import { useAuctionSocket } from "@/lib/useAuctionSocket";
 
 const BID_STEP = 10;
@@ -10,12 +13,24 @@ export default function HomeScreen() {
   const [userId] = useState(
     () => `user-${Math.random().toString(36).slice(2, 8)}`,
   );
+  const [videoRole, setVideoRole] = useState<AgoraRole>("buyer");
+  const {
+    joined,
+    remoteUid,
+    error: agoraError,
+    join,
+    leave,
+    uid,
+  } = useAgora(videoRole);
 
   const nextBid = auctionState.highestBid + BID_STEP;
   const canBid = auctionState.status === "LIVE";
 
   return (
-    <View className="flex-1 bg-background p-6">
+    <ScrollView
+      className="flex-1 bg-background"
+      contentContainerClassName="p-6 pb-16"
+    >
       <View className="mb-6 flex-row items-center gap-2">
         <View
           className={`h-2 w-2 rounded-full ${connected ? "bg-accent" : "bg-muted"}`}
@@ -79,6 +94,75 @@ export default function HomeScreen() {
         </View>
       )}
 
+      {/* Live video (Agora) — requires dev build, not Expo Go */}
+      <View className="mt-8">
+        <Text className="text-muted mb-2 text-xs uppercase tracking-wider">
+          Live video
+        </Text>
+        <View className="flex-row gap-2 mb-2">
+          <Pressable
+            onPress={() => setVideoRole("seller")}
+            className={`flex-1 rounded-lg py-2 ${
+              videoRole === "seller" ? "bg-primary" : "bg-surface"
+            }`}
+          >
+            <Text
+              className={`text-center text-sm font-medium ${
+                videoRole === "seller" ? "text-white" : "text-muted"
+              }`}
+            >
+              Seller
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={() => setVideoRole("buyer")}
+            className={`flex-1 rounded-lg py-2 ${
+              videoRole === "buyer" ? "bg-primary" : "bg-surface"
+            }`}
+          >
+            <Text
+              className={`text-center text-sm font-medium ${
+                videoRole === "buyer" ? "text-white" : "text-muted"
+              }`}
+            >
+              Buyer
+            </Text>
+          </Pressable>
+        </View>
+        {!joined ? (
+          <Pressable
+            onPress={join}
+            className="rounded-xl bg-accent py-3 active:opacity-80"
+          >
+            <Text className="text-center font-semibold text-white">
+              Join video
+            </Text>
+          </Pressable>
+        ) : (
+          <Pressable
+            onPress={leave}
+            className="rounded-xl border border-danger py-3 active:opacity-80"
+          >
+            <Text className="text-center font-semibold text-danger">
+              Leave video
+            </Text>
+          </Pressable>
+        )}
+        {agoraError && (
+          <View className="mt-2 rounded-lg border border-danger/50 bg-danger/10 p-2">
+            <Text className="text-danger text-xs">{agoraError}</Text>
+          </View>
+        )}
+        <View className="mt-3">
+          <AgoraVideo
+            role={videoRole}
+            joined={joined}
+            remoteUid={remoteUid}
+            uid={uid}
+          />
+        </View>
+      </View>
+
       <View className="mt-8">
         {canBid ? (
           <Pressable
@@ -103,6 +187,6 @@ export default function HomeScreen() {
       </View>
 
       <Text className="text-muted mt-6 text-center text-xs">You: {userId}</Text>
-    </View>
+    </ScrollView>
   );
 }

@@ -30,14 +30,17 @@ const ENV = {
   dev: {
     apiUrl: getDevApiUrl(),
     socketUrl: getDevSocketUrl(),
+    agoraAppId: process.env.EXPO_PUBLIC_AGORA_APP_ID ?? "",
   },
   staging: {
     apiUrl: "https://staging-api.example.com",
     socketUrl: "https://staging-api.example.com",
+    agoraAppId: process.env.EXPO_PUBLIC_AGORA_APP_ID ?? "",
   },
   prod: {
     apiUrl: "https://api.example.com",
     socketUrl: "https://api.example.com",
+    agoraAppId: process.env.EXPO_PUBLIC_AGORA_APP_ID ?? "",
   },
 };
 
