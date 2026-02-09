@@ -51,30 +51,50 @@ export function useAgora(role: AgoraRole) {
         setError("EXPO_PUBLIC_AGORA_APP_ID not set");
         return;
       }
+      const { ChannelProfileType, ClientRoleType } =
+        await import("react-native-agora");
+
       const token = await fetchAgoraToken(AGORA_CHANNEL, uidRef.current, role);
       const engine = createAgoraRtcEngine();
 
       const ctx = new RtcEngineContext();
       ctx.appId = appId;
+      ctx.channelProfile = ChannelProfileType.ChannelProfileLiveBroadcasting;
       engine.initialize(ctx);
 
+      // Enable the video module (needed for both sending and receiving)
+      engine.enableVideo();
+      engine.enableAudio();
+
+      engine.registerEventHandler({
+        onJoinChannelSuccess: () => {
+          console.log("[useAgora] joined channel");
+          setJoined(true);
+        },
+        onUserJoined: (_conn: unknown, u: number) => {
+          console.log("[useAgora] remote user joined:", u);
+          setRemoteUid(u);
+        },
+        onUserOffline: () => {
+          console.log("[useAgora] remote user left");
+          setRemoteUid(null);
+        },
+        onError: (err: number, msg?: string) => setError(msg ?? `Error ${err}`),
+      });
+
       const options = new ChannelMediaOptions();
+      options.clientRoleType =
+        role === "seller"
+          ? ClientRoleType.ClientRoleBroadcaster
+          : ClientRoleType.ClientRoleAudience;
       options.publishCameraTrack = role === "seller";
       options.publishMicrophoneTrack = role === "seller";
       options.autoSubscribeAudio = true;
       options.autoSubscribeVideo = true;
 
-      engine.registerEventHandler({
-        onJoinChannelSuccess: () => setJoined(true),
-        onUserJoined: (_conn: unknown, u: number) => setRemoteUid(u),
-        onUserOffline: () => setRemoteUid(null),
-        onError: (err: number, msg?: string) => setError(msg ?? `Error ${err}`),
-      });
-
       engine.joinChannel(token, AGORA_CHANNEL, uidRef.current, options);
 
       if (role === "seller") {
-        engine.enableLocalVideo(true);
         engine.startPreview();
       }
 
