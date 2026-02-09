@@ -1,18 +1,13 @@
 import Constants from "expo-constants";
 import { Platform } from "react-native";
 
-// Android emulator uses 10.0.2.2 to reach host localhost
-const getDevApiUrl = () =>
-  Platform.OS === "android" ? "http://10.0.2.2:3000" : "http://localhost:3000";
-
-// On native (Expo Go), use Metro bundler host so device can reach your machine. Web uses localhost.
-function getDevSocketUrl(): string {
+// Single base URL for API and Socket in dev. On device, use Metro host (your LAN IP) so both work.
+function getDevBaseUrl(): string {
   const override =
     Constants.expoConfig?.extra?.socketUrl ??
     process.env.EXPO_PUBLIC_SOCKET_URL;
   if (override) return override;
 
-  // Expo Go on device: use Metro bundler host (your dev machine) so socket can connect
   const manifest = Constants.expoConfig ?? Constants.manifest;
   const debuggerHost = (manifest as { debuggerHost?: string })?.debuggerHost;
   const hostUri = (manifest as { hostUri?: string })?.hostUri;
@@ -23,13 +18,15 @@ function getDevSocketUrl(): string {
       : null;
   if (host) return `http://${host}:3000`;
 
-  return getDevApiUrl();
+  return Platform.OS === "android"
+    ? "http://10.0.2.2:3000"
+    : "http://localhost:3000";
 }
 
 const ENV = {
   dev: {
-    apiUrl: getDevApiUrl(),
-    socketUrl: getDevSocketUrl(),
+    apiUrl: getDevBaseUrl(),
+    socketUrl: getDevBaseUrl(),
     agoraAppId: process.env.EXPO_PUBLIC_AGORA_APP_ID ?? "",
   },
   staging: {

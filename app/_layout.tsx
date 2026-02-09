@@ -28,9 +28,12 @@ export default function RootLayout() {
           <Stack
             screenOptions={{
               contentStyle: { backgroundColor: "#0B0B12" },
+              headerShown: false,
             }}
           >
-            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+            <Stack.Screen name="(tabs)" />
+            <Stack.Screen name="create-auction" />
+            <Stack.Screen name="auction/[id]" />
             <Stack.Screen
               name="modal"
               options={{

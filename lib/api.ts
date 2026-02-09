@@ -1,27 +1,29 @@
 import { env } from "@/constants/env";
+import type {
+  AuctionState,
+  AuctionListItem,
+  CreateAuctionInput,
+} from "@/types/auction";
 
-type RequestInitWithBody = RequestInit & {
+type RequestOptions = Omit<RequestInit, "body"> & {
   body?: object;
 };
 
 async function request<T>(
   path: string,
-  options: RequestInitWithBody = {},
+  options: RequestOptions = {},
 ): Promise<T> {
-  const { body, ...init } = options;
+  const { body, ...rest } = options;
   const url = `${env.apiUrl}${path}`;
 
   const config: RequestInit = {
-    ...init,
+    ...rest,
     headers: {
       "Content-Type": "application/json",
-      ...init.headers,
+      ...(rest.headers as HeadersInit),
     },
+    ...(body !== undefined && { body: JSON.stringify(body) }),
   };
-
-  if (body) {
-    config.body = JSON.stringify(body);
-  }
 
   const response = await fetch(url, config);
 
@@ -47,4 +49,18 @@ export const api = {
   patch: <T>(path: string, body?: object) =>
     request<T>(path, { method: "PATCH", body }),
   delete: <T>(path: string) => request<T>(path, { method: "DELETE" }),
+};
+
+export const auctionApi = {
+  fetchAuctions: () => api.get<AuctionListItem[]>("/auctions"),
+
+  fetchAuction: (id: string) => api.get<AuctionState>(`/auctions/${id}`),
+
+  createAuction: (body: CreateAuctionInput) =>
+    api.post<AuctionState>("/auctions", body),
+
+  startAuction: (id: string) => api.post<AuctionState>(`/auctions/${id}/start`),
+
+  extendAuction: (id: string, sellerId: string) =>
+    api.post<AuctionState>(`/auctions/${id}/extend`, { sellerId }),
 };
