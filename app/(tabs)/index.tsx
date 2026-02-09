@@ -1,4 +1,4 @@
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -31,6 +31,13 @@ export default function HomeScreen() {
   useEffect(() => {
     load();
   }, [load]);
+
+  // Refetch when user switches to Home tab so new auctions appear without manual refresh
+  useFocusEffect(
+    useCallback(() => {
+      load();
+    }, [load]),
+  );
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);

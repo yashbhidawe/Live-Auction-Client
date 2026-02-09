@@ -26,7 +26,11 @@ export const useAuctionStore = create<AuctionStore>((set) => ({
 
   fetchAuctions: async () => {
     const list = await auctionApi.fetchAuctions();
-    set({ auctions: list });
+    set((prev) => {
+      const fromApi = new Set(list.map((a) => a.id));
+      const extra = prev.auctions.filter((a) => !fromApi.has(a.id));
+      return { auctions: [...list, ...extra] };
+    });
   },
 
   addAuction: (state) =>
