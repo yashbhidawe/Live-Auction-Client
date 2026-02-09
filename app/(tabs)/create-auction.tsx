@@ -73,10 +73,10 @@ export default function CreateAuctionScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-background" edges={["top"]}>
-      <View className="border-b border-surface px-4 py-2">
-        <Pressable onPress={() => router.back()} className="self-start py-2">
-          <Text className="text-primary font-medium">← Back</Text>
-        </Pressable>
+      <View className="border-b border-surface px-4 py-3">
+        <Text className="text-foreground text-lg font-semibold">
+          Create auction
+        </Text>
       </View>
       <ScrollView
         className="flex-1"

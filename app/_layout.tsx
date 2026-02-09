@@ -32,7 +32,6 @@ export default function RootLayout() {
             }}
           >
             <Stack.Screen name="(tabs)" />
-            <Stack.Screen name="create-auction" />
             <Stack.Screen name="auction/[id]" />
             <Stack.Screen
               name="modal"

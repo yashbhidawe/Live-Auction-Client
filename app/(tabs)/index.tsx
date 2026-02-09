@@ -45,10 +45,6 @@ export default function HomeScreen() {
     [router, setSelectedAuction],
   );
 
-  const onPressCreate = useCallback(() => {
-    router.push("/create-auction");
-  }, [router]);
-
   const renderItem = useCallback(
     ({ item }: { item: AuctionListItem }) => (
       <Pressable
@@ -118,7 +114,7 @@ export default function HomeScreen() {
         ListEmptyComponent={
           <View className="py-12">
             <Text className="text-muted text-center">
-              No auctions yet. Create one to get started.
+              No auctions yet. Use the Create tab to start one.
             </Text>
           </View>
         }
@@ -130,17 +126,6 @@ export default function HomeScreen() {
           />
         }
       />
-
-      <View className="absolute bottom-6 left-6 right-6">
-        <Pressable
-          onPress={onPressCreate}
-          className="rounded-xl bg-primary py-4 active:opacity-90"
-        >
-          <Text className="text-center text-lg font-semibold text-white">
-            Create auction
-          </Text>
-        </Pressable>
-      </View>
     </View>
   );
 }
