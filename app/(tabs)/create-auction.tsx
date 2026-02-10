@@ -10,12 +10,11 @@ import { useAuctionStore } from "@/store/auctionStore";
 
 const itemSchema = z.object({
   name: z.string().min(1, "Name required"),
-  startingPrice: z.coerce.number().min(0, "Must be ≥ 0"),
+  startingPrice: z.coerce.number().min(0, "Must be >= 0"),
   durationSec: z.coerce.number().min(1).max(300).optional(),
 });
 
 const formSchema = z.object({
-  sellerId: z.string().min(1, "Your name / seller ID required"),
   items: z.array(itemSchema).min(1, "Add at least one item"),
 });
 
@@ -29,7 +28,7 @@ const defaultItem: FormData["items"][0] = {
 
 export default function CreateAuctionScreen() {
   const router = useRouter();
-  const { addAuction, setCurrentUserId } = useAuctionStore();
+  const { addAuction, user } = useAuctionStore();
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   const {
@@ -39,7 +38,6 @@ export default function CreateAuctionScreen() {
   } = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      sellerId: "",
       items: [defaultItem],
     },
   });
@@ -48,10 +46,11 @@ export default function CreateAuctionScreen() {
 
   const onSubmit = useCallback(
     async (data: FormData) => {
+      if (!user) return;
       setSubmitError(null);
       try {
         const payload = {
-          sellerId: data.sellerId.trim(),
+          sellerId: user.id,
           items: data.items.map((item) => ({
             name: item.name.trim(),
             startingPrice: Number(item.startingPrice),
@@ -61,14 +60,13 @@ export default function CreateAuctionScreen() {
           })),
         };
         const state = await auctionApi.createAuction(payload);
-        setCurrentUserId(data.sellerId.trim());
         addAuction(state);
         router.replace(`/auction/${state.id}` as const);
       } catch (e) {
         setSubmitError(e instanceof Error ? e.message : String(e));
       }
     },
-    [addAuction, router, setCurrentUserId],
+    [addAuction, router, user],
   );
 
   return (
@@ -77,36 +75,18 @@ export default function CreateAuctionScreen() {
         <Text className="text-foreground text-lg font-semibold">
           Create auction
         </Text>
+        {user && (
+          <Text className="text-muted text-xs mt-1">
+            Creating as: {user.displayName}
+          </Text>
+        )}
       </View>
       <ScrollView
         className="flex-1"
         contentContainerClassName="p-6 pb-24"
         keyboardShouldPersistTaps="handled"
       >
-        <Text className="text-muted mb-1 text-xs uppercase tracking-wider">
-          Your name (seller ID)
-        </Text>
-        <Controller
-          control={control}
-          name="sellerId"
-          render={({ field: { onChange, onBlur, value } }) => (
-            <TextInput
-              className="mt-1 rounded-xl border border-surface bg-surface px-4 py-3 text-foreground"
-              placeholder="e.g. seller-1"
-              placeholderTextColor="#A1A1B3"
-              onBlur={onBlur}
-              onChangeText={onChange}
-              value={value}
-            />
-          )}
-        />
-        {errors.sellerId && (
-          <Text className="text-danger mt-1 text-xs">
-            {errors.sellerId.message}
-          </Text>
-        )}
-
-        <View className="mt-6 flex-row items-center justify-between">
+        <View className="flex-row items-center justify-between">
           <Text className="text-muted text-xs uppercase tracking-wider">
             Items
           </Text>

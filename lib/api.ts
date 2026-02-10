@@ -51,6 +51,13 @@ export const api = {
   delete: <T>(path: string) => request<T>(path, { method: "DELETE" }),
 };
 
+export const userApi = {
+  register: (displayName: string) =>
+    api.post<{ id: string; displayName: string }>("/users", { displayName }),
+  getUser: (id: string) =>
+    api.get<{ id: string; displayName: string }>(`/users/${id}`),
+};
+
 export const auctionApi = {
   fetchAuctions: () => api.get<AuctionListItem[]>("/auctions"),
 

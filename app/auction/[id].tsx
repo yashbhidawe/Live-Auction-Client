@@ -48,9 +48,8 @@ export default function AuctionWatchScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const auctionId = id ?? null;
-  const { currentUserId } = useAuctionStore();
-  const userId =
-    currentUserId ?? `user-${Math.random().toString(36).slice(2, 8)}`;
+  const { user } = useAuctionStore();
+  const userId = user?.id ?? "";
 
   /* ── socket ── */
   const {
@@ -415,7 +414,12 @@ export default function AuctionWatchScreen() {
 
         {/* Seller label */}
         {auctionState && (
-          <Text style={s.sellerLabel}>@{auctionState.sellerId}</Text>
+          <Text style={s.sellerLabel}>
+            @
+            {isSeller
+              ? (user?.displayName ?? "You")
+              : auctionState.sellerId.slice(0, 8)}
+          </Text>
         )}
       </View>
     </View>

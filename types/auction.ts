@@ -33,6 +33,7 @@ export interface AuctionListItem {
   id: string;
   sellerId: string;
   status: string;
+  sellerName?: string;
 }
 
 export interface CreateAuctionItemInput {
