@@ -29,6 +29,9 @@ export function useAgora(role: AgoraRole, channelName?: string) {
   const engineRef = useRef<{
     leaveChannel: () => number;
     release: (sync?: boolean) => void;
+    switchCamera: () => number;
+    setCameraCapturerConfiguration: (config: unknown) => number;
+    [key: string]: unknown;
   } | null>(null);
   const uidRef = useRef(Math.floor(Math.random() * 100000) + 1);
 
@@ -64,6 +67,7 @@ export function useAgora(role: AgoraRole, channelName?: string) {
       const isRejoin = engine != null;
 
       if (!engine) {
+        const { CameraDirection } = await import("react-native-agora");
         engine = createAgoraRtcEngine();
         const ctx = new RtcEngineContext();
         ctx.appId = appId;
@@ -71,6 +75,10 @@ export function useAgora(role: AgoraRole, channelName?: string) {
         engine.initialize(ctx);
         engine.enableVideo();
         engine.enableAudio();
+        // Default to rear camera
+        engine.setCameraCapturerConfiguration({
+          cameraDirection: CameraDirection.CameraRear,
+        });
         engine.registerEventHandler({
           onJoinChannelSuccess: (_conn: unknown, uid: number) => {
             console.log("[useAgora] joined channel", channel, "uid", uid);
@@ -125,6 +133,12 @@ export function useAgora(role: AgoraRole, channelName?: string) {
     setRemoteUid(null);
   }, []);
 
+  const switchCamera = useCallback(() => {
+    if (engineRef.current) {
+      engineRef.current.switchCamera();
+    }
+  }, []);
+
   useEffect(() => () => leave(), [leave]);
 
   return {
@@ -133,6 +147,7 @@ export function useAgora(role: AgoraRole, channelName?: string) {
     error,
     join,
     leave,
+    switchCamera,
     uid: uidRef.current,
     channel: channelName ?? AGORA_CHANNEL,
   };

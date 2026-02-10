@@ -10,15 +10,22 @@ type AgoraVideoProps = {
 };
 
 /**
- * Renders local (seller) or remote (viewer) Agora video.
- * Only works in native dev build; on web or Expo Go shows a placeholder.
+ * Full-screen video background. Renders the seller's camera (local) or the
+ * buyer's remote stream using an absolutely-positioned RtcSurfaceView that
+ * fills its parent. When there's nothing to show, displays a dark placeholder.
  */
-export function AgoraVideo({ role, joined, remoteUid, uid }: AgoraVideoProps) {
+export function AgoraVideo({
+  role,
+  joined,
+  remoteUid,
+  uid,
+  channelId,
+}: AgoraVideoProps) {
   if (Platform.OS === "web") {
     return (
       <View style={styles.placeholder}>
         <Text style={styles.placeholderText}>
-          Live video only in native app (run with dev client)
+          Live video only in native app
         </Text>
       </View>
     );
@@ -27,7 +34,7 @@ export function AgoraVideo({ role, joined, remoteUid, uid }: AgoraVideoProps) {
   if (!joined) {
     return (
       <View style={styles.placeholder}>
-        <Text style={styles.placeholderText}>Not in channel</Text>
+        <Text style={styles.placeholderText}>Connecting to stream…</Text>
       </View>
     );
   }
@@ -35,40 +42,34 @@ export function AgoraVideo({ role, joined, remoteUid, uid }: AgoraVideoProps) {
   try {
     const { RtcSurfaceView } = require("react-native-agora");
 
+    if (role === "seller") {
+      return (
+        <View style={StyleSheet.absoluteFill}>
+          <RtcSurfaceView canvas={{ uid: 0 }} style={StyleSheet.absoluteFill} />
+        </View>
+      );
+    }
+
+    if (role === "buyer" && remoteUid != null) {
+      return (
+        <View style={StyleSheet.absoluteFill}>
+          <RtcSurfaceView
+            canvas={{
+              uid: remoteUid,
+              ...(channelId ? { channelId } : {}),
+            }}
+            style={StyleSheet.absoluteFill}
+          />
+        </View>
+      );
+    }
+
+    // Buyer but no remote stream yet
     return (
-      <View style={styles.container}>
-        {role === "seller" && (
-          <View style={styles.video}>
-            <RtcSurfaceView
-              canvas={{ uid: 0 }}
-              style={StyleSheet.absoluteFill}
-            />
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>You (seller)</Text>
-            </View>
-          </View>
-        )}
-        {role === "buyer" && remoteUid != null && (
-          <View style={styles.video}>
-            <RtcSurfaceView
-              canvas={{
-                uid: remoteUid,
-                ...(channelId ? { channelId } : {}),
-              }}
-              style={StyleSheet.absoluteFill}
-            />
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>Live</Text>
-            </View>
-          </View>
-        )}
-        {role === "buyer" && remoteUid == null && (
-          <View style={styles.placeholder}>
-            <Text style={styles.placeholderText}>
-              Waiting for seller stream…
-            </Text>
-          </View>
-        )}
+      <View style={styles.placeholder}>
+        <Text style={styles.placeholderText}>
+          Waiting for seller to go live…
+        </Text>
       </View>
     );
   } catch {
@@ -83,41 +84,16 @@ export function AgoraVideo({ role, joined, remoteUid, uid }: AgoraVideoProps) {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    aspectRatio: 16 / 9,
-    backgroundColor: "#000",
-    borderRadius: 12,
-    overflow: "hidden",
-  },
-  video: {
-    flex: 1,
-    position: "relative",
-  },
-  badge: {
-    position: "absolute",
-    top: 8,
-    left: 8,
-    backgroundColor: "rgba(0,0,0,0.6)",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  badgeText: {
-    color: "#fff",
-    fontSize: 12,
-    fontWeight: "600",
-  },
   placeholder: {
-    aspectRatio: 16 / 9,
-    backgroundColor: "#151527",
-    borderRadius: 12,
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "#0B0B12",
     justifyContent: "center",
     alignItems: "center",
     padding: 16,
   },
   placeholderText: {
     color: "#A1A1B3",
-    fontSize: 14,
+    fontSize: 16,
     textAlign: "center",
   },
 });
