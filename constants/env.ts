@@ -23,21 +23,25 @@ function getDevBaseUrl(): string {
     : "http://localhost:3000";
 }
 
+const extra = Constants.expoConfig?.extra as
+  | { apiUrl?: string; socketUrl?: string; agoraAppId?: string }
+  | undefined;
+
 const ENV = {
   dev: {
     apiUrl: getDevBaseUrl(),
     socketUrl: getDevBaseUrl(),
-    agoraAppId: process.env.EXPO_PUBLIC_AGORA_APP_ID ?? "",
+    agoraAppId: process.env.EXPO_PUBLIC_AGORA_APP_ID ?? extra?.agoraAppId ?? "",
   },
   staging: {
-    apiUrl: "https://staging-api.example.com",
-    socketUrl: "https://staging-api.example.com",
-    agoraAppId: process.env.EXPO_PUBLIC_AGORA_APP_ID ?? "",
+    apiUrl: extra?.apiUrl ?? "https://staging-api.example.com",
+    socketUrl: extra?.socketUrl ?? "https://staging-api.example.com",
+    agoraAppId: extra?.agoraAppId ?? process.env.EXPO_PUBLIC_AGORA_APP_ID ?? "",
   },
   prod: {
-    apiUrl: "https://api.example.com",
-    socketUrl: "https://api.example.com",
-    agoraAppId: process.env.EXPO_PUBLIC_AGORA_APP_ID ?? "",
+    apiUrl: extra?.apiUrl ?? "https://api.example.com",
+    socketUrl: extra?.socketUrl ?? "https://api.example.com",
+    agoraAppId: extra?.agoraAppId ?? process.env.EXPO_PUBLIC_AGORA_APP_ID ?? "",
   },
 };
 
