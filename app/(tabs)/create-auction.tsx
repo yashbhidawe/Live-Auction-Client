@@ -2,7 +2,14 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "expo-router";
 import { useCallback, useState } from "react";
 import { Controller, useFieldArray, useForm } from "react-hook-form";
-import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import {
+  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { z } from "zod";
 import { auctionApi } from "@/lib/api";
@@ -28,8 +35,9 @@ const defaultItem: FormData["items"][0] = {
 
 export default function CreateAuctionScreen() {
   const router = useRouter();
-  const { addAuction, user } = useAuctionStore();
+  const { addAuction, user, syncError, syncLoading } = useAuctionStore();
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
   const {
     control,
@@ -46,8 +54,12 @@ export default function CreateAuctionScreen() {
 
   const onSubmit = useCallback(
     async (data: FormData) => {
-      if (!user) return;
+      if (!user) {
+        setSubmitError("Please sign in to create an auction");
+        return;
+      }
       setSubmitError(null);
+      setLoading(true);
       try {
         const payload = {
           sellerId: user.id,
@@ -64,6 +76,8 @@ export default function CreateAuctionScreen() {
         router.replace(`/auction/${state.id}` as const);
       } catch (e) {
         setSubmitError(e instanceof Error ? e.message : String(e));
+      } finally {
+        setLoading(false);
       }
     },
     [addAuction, router, user],
@@ -184,13 +198,27 @@ export default function CreateAuctionScreen() {
           </View>
         )}
 
+        {!user && !loading && (
+          <Text className="text-muted text-sm mt-4 text-center">
+            {syncError
+              ? "Sync failed. Tap Retry above."
+              : syncLoading
+                ? "Signing you in…"
+                : "Signing you in…"}
+          </Text>
+        )}
         <Pressable
           onPress={handleSubmit(onSubmit)}
-          className="mt-8 rounded-xl bg-primary py-4 active:opacity-90"
+          disabled={loading || !user}
+          className="mt-8 rounded-xl bg-primary py-4 active:opacity-90 disabled:opacity-70"
         >
-          <Text className="text-center text-lg font-semibold text-white">
-            Create & open auction
-          </Text>
+          {loading ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text className="text-center text-lg font-semibold text-white">
+              Create & open auction
+            </Text>
+          )}
         </Pressable>
       </ScrollView>
     </SafeAreaView>

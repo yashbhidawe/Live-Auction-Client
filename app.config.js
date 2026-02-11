@@ -10,7 +10,7 @@ export default {
     scheme: "client",
     userInterfaceStyle: "automatic",
     newArchEnabled: true,
-    ios: { supportsTablet: true },
+    ios: { supportsTablet: true, bundleIdentifier: "com.liveauction.app" },
     android: {
       package: "com.liveauction.app",
       adaptiveIcon: {
@@ -26,6 +26,7 @@ export default {
       bundler: "metro",
     },
     plugins: [
+      ["expo-build-properties", { android: { usesCleartextTraffic: true } }],
       "expo-router",
       [
         "expo-splash-screen",
@@ -47,6 +48,7 @@ export default {
       apiUrl: process.env.EXPO_PUBLIC_API_URL ?? "",
       socketUrl: process.env.EXPO_PUBLIC_SOCKET_URL ?? "",
       agoraAppId: process.env.EXPO_PUBLIC_AGORA_APP_ID ?? "",
+      clerkPublishableKey: process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY ?? "",
     },
   },
 };

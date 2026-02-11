@@ -24,7 +24,12 @@ function getDevBaseUrl(): string {
 }
 
 const extra = Constants.expoConfig?.extra as
-  | { apiUrl?: string; socketUrl?: string; agoraAppId?: string }
+  | {
+      apiUrl?: string;
+      socketUrl?: string;
+      agoraAppId?: string;
+      clerkPublishableKey?: string;
+    }
   | undefined;
 
 const ENV = {
@@ -32,16 +37,28 @@ const ENV = {
     apiUrl: getDevBaseUrl(),
     socketUrl: getDevBaseUrl(),
     agoraAppId: process.env.EXPO_PUBLIC_AGORA_APP_ID ?? extra?.agoraAppId ?? "",
+    clerkPublishableKey:
+      process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY ??
+      extra?.clerkPublishableKey ??
+      "",
   },
   staging: {
     apiUrl: extra?.apiUrl ?? "https://staging-api.example.com",
     socketUrl: extra?.socketUrl ?? "https://staging-api.example.com",
     agoraAppId: extra?.agoraAppId ?? process.env.EXPO_PUBLIC_AGORA_APP_ID ?? "",
+    clerkPublishableKey:
+      process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY ??
+      extra?.clerkPublishableKey ??
+      "",
   },
   prod: {
     apiUrl: extra?.apiUrl ?? "https://api.example.com",
     socketUrl: extra?.socketUrl ?? "https://api.example.com",
     agoraAppId: extra?.agoraAppId ?? process.env.EXPO_PUBLIC_AGORA_APP_ID ?? "",
+    clerkPublishableKey:
+      process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY ??
+      extra?.clerkPublishableKey ??
+      "",
   },
 };
 

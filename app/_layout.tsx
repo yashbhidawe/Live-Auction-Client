@@ -1,4 +1,4 @@
-import { Stack, useRouter, useSegments } from "expo-router";
+import { Redirect, Stack, usePathname } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import * as SplashScreen from "expo-splash-screen";
 import { useEffect } from "react";
@@ -8,64 +8,163 @@ import "react-native-reanimated";
 
 import "../global.css";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { ClerkProvider, useAuth } from "@clerk/clerk-expo";
+import { tokenCache } from "@clerk/clerk-expo/token-cache";
+import { env } from "@/constants/env";
+import { setTokenProvider, userApi } from "@/lib/api";
 import { useAuctionStore } from "@/store/auctionStore";
 
-// Keep splash visible until we're ready
 SplashScreen.preventAutoHideAsync();
 
 export const unstable_settings = {
   anchor: "(tabs)",
 };
 
-export default function RootLayout() {
-  const router = useRouter();
-  const segments = useSegments();
-  const { user, authLoaded, loadUserFromStorage } = useAuctionStore();
+function AuthSync() {
+  const { isLoaded, isSignedIn, getToken } = useAuth();
+  const { setUser, logout, setSyncError, setSyncLoading, _retrySyncTrigger } =
+    useAuctionStore();
 
-  // Load user from AsyncStorage on mount
   useEffect(() => {
-    loadUserFromStorage().finally(() => {
-      SplashScreen.hideAsync();
-    });
-  }, [loadUserFromStorage]);
+    if (!isLoaded) return;
+    console.log("[AuthSync] Token provider set (isLoaded=true)");
+    setTokenProvider(getToken);
+  }, [isLoaded, getToken]);
 
-  // Auth gate: redirect to /register if no user, or away from /register if logged in
   useEffect(() => {
-    if (!authLoaded) return;
-
-    const onRegisterScreen = segments[0] === "register";
-
-    if (!user && !onRegisterScreen) {
-      router.replace("/register");
-    } else if (user && onRegisterScreen) {
-      router.replace("/(tabs)");
+    if (!isLoaded || !isSignedIn) {
+      if (!isSignedIn) {
+        console.log("[AuthSync] Not signed in, clearing user");
+        logout();
+      }
+      setSyncError(null);
+      setSyncLoading(false);
+      return;
     }
-  }, [user, authLoaded, segments, router]);
+    let cancelled = false;
+    setSyncError(null);
+    setSyncLoading(true);
+    console.log("[AuthSync] Signed in, starting sync…");
+
+    // Log token presence before making the request
+    getToken()
+      .then((t) =>
+        console.log(
+          `[AuthSync] Token: ${t ? `${t.slice(0, 20)}…(${t.length} chars)` : "NULL"}`,
+        ),
+      )
+      .catch(() => console.warn("[AuthSync] Failed to read token"));
+
+    userApi
+      .sync()
+      .then((user) => {
+        if (!cancelled) {
+          console.log(
+            `[AuthSync] Sync OK: id=${user.id}, name=${user.displayName}`,
+          );
+          setUser({ id: user.id, displayName: user.displayName });
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          const msg =
+            err instanceof Error
+              ? err.message
+              : "Failed to sync. Check server & network.";
+          console.error(`[AuthSync] Sync FAILED: ${msg}`);
+          setSyncError(msg);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setSyncLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    isLoaded,
+    isSignedIn,
+    _retrySyncTrigger,
+    setUser,
+    logout,
+    setSyncError,
+    setSyncLoading,
+  ]);
+
+  return null;
+}
+
+function AuthGate({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  const { isLoaded, isSignedIn } = useAuth();
+
+  const onRegisterScreen =
+    pathname === "/register" || pathname?.startsWith("/register");
+
+  if (!isLoaded) return null;
+
+  if (!isSignedIn && !onRegisterScreen) {
+    return <Redirect href="/register" />;
+  }
+  if (isSignedIn && onRegisterScreen) {
+    return <Redirect href="/(tabs)" />;
+  }
+
+  return <>{children}</>;
+}
+
+export default function RootLayout() {
+  const publishableKey = env.clerkPublishableKey;
+
+  if (!publishableKey) {
+    console.warn(
+      "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY is not set. Add it to .env or app.config.js extra.",
+    );
+  }
 
   return (
-    <ErrorBoundary>
-      <GestureHandlerRootView style={{ flex: 1, backgroundColor: "#0B0B12" }}>
-        <SafeAreaProvider>
-          <Stack
-            screenOptions={{
-              contentStyle: { backgroundColor: "#0B0B12" },
-              headerShown: false,
-            }}
-          >
-            <Stack.Screen name="register" />
-            <Stack.Screen name="(tabs)" />
-            <Stack.Screen name="auction/[id]" />
-            <Stack.Screen
-              name="modal"
-              options={{
-                presentation: "modal",
-                title: "Modal",
-              }}
-            />
-          </Stack>
-          <StatusBar style="light" />
-        </SafeAreaProvider>
-      </GestureHandlerRootView>
-    </ErrorBoundary>
+    <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache}>
+      <ErrorBoundary>
+        <GestureHandlerRootView style={{ flex: 1, backgroundColor: "#0B0B12" }}>
+          <SafeAreaProvider>
+            <AuthSync />
+            <LayoutContent />
+          </SafeAreaProvider>
+        </GestureHandlerRootView>
+      </ErrorBoundary>
+    </ClerkProvider>
+  );
+}
+
+function LayoutContent() {
+  const { isLoaded } = useAuth();
+
+  useEffect(() => {
+    if (isLoaded) SplashScreen.hideAsync();
+  }, [isLoaded]);
+
+  if (!isLoaded) return null;
+
+  return (
+    <AuthGate>
+      <Stack
+        screenOptions={{
+          contentStyle: { backgroundColor: "#0B0B12" },
+          headerShown: false,
+        }}
+      >
+        <Stack.Screen name="register" />
+        <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="auction/[id]" />
+        <Stack.Screen
+          name="modal"
+          options={{
+            presentation: "modal",
+            title: "Modal",
+          }}
+        />
+      </Stack>
+      <StatusBar style="light" />
+    </AuthGate>
   );
 }

@@ -1,3 +1,4 @@
+import { useClerk } from "@clerk/clerk-expo";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import {
@@ -14,6 +15,7 @@ import type { AuctionListItem } from "@/types/auction";
 
 export default function HomeScreen() {
   const router = useRouter();
+  const { signOut } = useClerk();
   const { auctions, fetchAuctions, setSelectedAuction, user } =
     useAuctionStore();
   const { connected, connectionError } = useAuctionSocket(null);
@@ -108,11 +110,19 @@ export default function HomeScreen() {
                   : "Connecting…"}
             </Text>
           </View>
-          {user && (
-            <Text className="text-foreground text-sm font-medium">
-              Hi, {user.displayName}
-            </Text>
-          )}
+          <View className="flex-row items-center gap-3">
+            {user && (
+              <Text className="text-foreground text-sm font-medium">
+                Hi, {user.displayName}
+              </Text>
+            )}
+            <Pressable
+              onPress={() => signOut()}
+              className="rounded-lg bg-surface px-3 py-1.5 active:opacity-80"
+            >
+              <Text className="text-muted text-xs">Sign out</Text>
+            </Pressable>
+          </View>
         </View>
         {connectionError && (
           <Text className="text-danger mt-1 text-xs">

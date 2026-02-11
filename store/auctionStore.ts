@@ -7,7 +7,13 @@ interface AuctionStore {
   /* ── user identity ── */
   user: StoredUser | null;
   authLoaded: boolean;
+  syncError: string | null;
+  syncLoading: boolean;
+  _retrySyncTrigger: number;
   setUser: (user: StoredUser) => void;
+  setSyncError: (err: string | null) => void;
+  setSyncLoading: (loading: boolean) => void;
+  retrySync: () => void;
   loadUserFromStorage: () => Promise<void>;
   logout: () => Promise<void>;
 
@@ -24,11 +30,22 @@ export const useAuctionStore = create<AuctionStore>((set) => ({
   /* ── user identity ── */
   user: null,
   authLoaded: false,
+  syncError: null,
+  syncLoading: false,
+  _retrySyncTrigger: 0,
 
   setUser: (user) => {
     saveUser(user).catch(() => {});
-    set({ user });
+    set({ user, syncError: null });
   },
+
+  setSyncError: (syncError) => set({ syncError }),
+  setSyncLoading: (syncLoading) => set({ syncLoading }),
+  retrySync: () =>
+    set((s) => ({
+      _retrySyncTrigger: s._retrySyncTrigger + 1,
+      syncError: null,
+    })),
 
   loadUserFromStorage: async () => {
     const user = await loadUser();
@@ -37,7 +54,7 @@ export const useAuctionStore = create<AuctionStore>((set) => ({
 
   logout: async () => {
     await clearUser();
-    set({ user: null });
+    set({ user: null, syncError: null });
   },
 
   /* ── auctions ── */
