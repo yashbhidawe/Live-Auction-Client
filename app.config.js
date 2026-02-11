@@ -12,6 +12,7 @@ export default {
     newArchEnabled: true,
     ios: { supportsTablet: true },
     android: {
+      package: "com.liveauction.app",
       adaptiveIcon: {
         backgroundColor: "#E6F4FE",
         foregroundImage: "./assets/images/android-icon-foreground.png",
