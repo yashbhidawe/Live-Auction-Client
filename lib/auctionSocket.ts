@@ -35,8 +35,6 @@ export interface ChatComment {
 
 export interface SendCommentPayload {
   auctionId: string;
-  userId: string;
-  displayName: string;
   text: string;
 }
 

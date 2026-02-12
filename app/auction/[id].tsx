@@ -272,8 +272,6 @@ export default function AuctionWatchScreen() {
       return;
     }
     sendComment({
-      userId,
-      displayName: user?.displayName?.trim() || `user-${userId.slice(0, 6)}`,
       text,
     });
     setCommentText("");
@@ -643,7 +641,7 @@ export default function AuctionWatchScreen() {
                   {/* Bid button */}
                   {canBid && !isSeller && (
                     <Pressable
-                      onPress={() => placeBid(userId, nextBid)}
+                      onPress={() => placeBid(nextBid)}
                       style={s.bidBtn}
                     >
                       <Text style={s.bidBtnText}>Bid ${nextBid}</Text>

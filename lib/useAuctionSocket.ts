@@ -104,10 +104,14 @@ export function useAuctionSocket(auctionId: string | null) {
   }, [auctionId]);
 
   const placeBid = useCallback(
-    (userId: string, amount: number) => {
+    (amount: number) => {
       if (!auctionId) return;
       setBidResult(null);
-      socketRef.current?.emit("place_bid", { auctionId, userId, amount });
+      socketRef.current?.emit("place_bid", {
+        auctionId,
+        amount,
+        idempotencyKey: `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+      });
     },
     [auctionId],
   );
@@ -118,8 +122,6 @@ export function useAuctionSocket(auctionId: string | null) {
       setCommentError(null);
       socketRef.current?.emit("send_comment", {
         auctionId,
-        userId: payload.userId,
-        displayName: payload.displayName,
         text: payload.text,
       } satisfies SendCommentPayload);
     },
