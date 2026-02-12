@@ -2,8 +2,11 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Animated,
-  Dimensions,
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
+  TextInput,
   StatusBar,
   StyleSheet,
   Text,
@@ -18,7 +21,8 @@ import { useAuctionSocket } from "@/lib/useAuctionSocket";
 import { useAuctionStore } from "@/store/auctionStore";
 
 const BID_STEP = 10;
-const { height: SCREEN_H } = Dimensions.get("window");
+const MAX_COMMENT_LENGTH = 180;
+const COMMENT_RATE_LIMIT_MS = 800;
 
 /* ───── countdown hook ───── */
 function useItemCountdown(itemEndTimeMs: number | undefined) {
@@ -41,6 +45,16 @@ function useItemCountdown(itemEndTimeMs: number | undefined) {
   return remainingSec;
 }
 
+function formatCommentAge(createdAt: number) {
+  const sec = Math.max(0, Math.floor((Date.now() - createdAt) / 1000));
+  if (sec < 10) return "now";
+  if (sec < 60) return `${sec}s`;
+  const min = Math.floor(sec / 60);
+  if (min < 60) return `${min}m`;
+  const hr = Math.floor(min / 60);
+  return `${hr}h`;
+}
+
 /* ═══════════════════════════════════════════════════════════════════════════ */
 
 export default function AuctionWatchScreen() {
@@ -58,6 +72,9 @@ export default function AuctionWatchScreen() {
     connected,
     connectionError,
     placeBid,
+    comments,
+    sendComment,
+    commentError,
     lastItemSold,
     lastAuctionEnded,
   } = useAuctionSocket(auctionId);
@@ -159,6 +176,11 @@ export default function AuctionWatchScreen() {
   /* ── actions ── */
   const [starting, setStarting] = useState(false);
   const [extending, setExtending] = useState(false);
+  const [commentText, setCommentText] = useState("");
+  const [localCommentError, setLocalCommentError] = useState<string | null>(
+    null,
+  );
+  const lastCommentAtRef = useRef(0);
 
   const handleStart = useCallback(async () => {
     if (!auctionId) return;
@@ -185,6 +207,37 @@ export default function AuctionWatchScreen() {
       // Could navigate back or show summary
     }
   }, [lastAuctionEnded, auctionId]);
+
+  const handleSendComment = useCallback(() => {
+    if (!auctionId || !userId) return;
+    const text = commentText.trim();
+    if (!text) {
+      setLocalCommentError("Comment cannot be empty");
+      return;
+    }
+    if (text.length > MAX_COMMENT_LENGTH) {
+      setLocalCommentError(`Max ${MAX_COMMENT_LENGTH} characters`);
+      return;
+    }
+    const now = Date.now();
+    if (now - lastCommentAtRef.current < COMMENT_RATE_LIMIT_MS) {
+      setLocalCommentError("You are commenting too fast");
+      return;
+    }
+    sendComment({
+      userId,
+      displayName: user?.displayName?.trim() || `user-${userId.slice(0, 6)}`,
+      text,
+    });
+    setCommentText("");
+    setLocalCommentError(null);
+    lastCommentAtRef.current = now;
+    Keyboard.dismiss();
+  }, [auctionId, commentText, sendComment, user?.displayName, userId]);
+
+  const visibleComments = comments.slice(-6);
+  const canSendComment =
+    connected && commentText.trim().length > 0 && userId.length > 0;
 
   /* ── invalid auction ── */
   if (!auctionId) {
@@ -222,6 +275,8 @@ export default function AuctionWatchScreen() {
         uid={uid}
         channelId={channel}
       />
+      <View pointerEvents="none" style={s.topScrim} />
+      <View pointerEvents="none" style={s.bottomScrim} />
 
       {/* ── LAYER 2: Floating winner announcement ── */}
       {winnerAnnouncement && (
@@ -287,141 +342,214 @@ export default function AuctionWatchScreen() {
         </View>
       </View>
 
-      {/* ── LAYER 4: Bottom overlay (item info + bid + seller controls) ── */}
-      <View style={[s.bottomOverlay, { paddingBottom: insets.bottom + 16 }]}>
-        {/* Agora error */}
-        {agoraError && (
-          <View style={s.errorBanner}>
-            <Text style={s.errorText}>{agoraError}</Text>
+      {/* ── LAYER 4: Floating stream comments ── */}
+      <View
+        style={[s.chatOverlay, { bottom: insets.bottom + 220 }]}
+        pointerEvents="box-none"
+      >
+        <View style={s.chatOverlayHeader}>
+          <Text style={s.chatOverlayTitle}>Live chat</Text>
+          <Text style={s.chatOverlayCount}>{comments.length}</Text>
+        </View>
+        {visibleComments.map((comment, idx) => {
+          const isMine = comment.userId === userId;
+          return (
+            <View
+              key={comment.id}
+              style={[
+                s.commentBubble,
+                isMine ? s.commentBubbleMine : null,
+                { opacity: 0.45 + (idx + 1) / visibleComments.length / 2 },
+              ]}
+            >
+              <View style={s.commentMetaRow}>
+                <Text style={s.commentAuthor}>{comment.displayName}</Text>
+                <Text style={s.commentAge}>
+                  {formatCommentAge(comment.createdAt)}
+                </Text>
+              </View>
+              <Text style={s.commentText}>{comment.text}</Text>
+            </View>
+          );
+        })}
+      </View>
+
+      {/* ── LAYER 5: Bottom overlay (item info + bid + seller controls + chat input) ── */}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        style={s.bottomOverlayWrap}
+      >
+        <View style={[s.bottomOverlay, { paddingBottom: insets.bottom + 16 }]}>
+          <View style={s.chatComposer}>
+            <TextInput
+              value={commentText}
+              onChangeText={(val) => {
+                if (val.length <= MAX_COMMENT_LENGTH) {
+                  setCommentText(val);
+                  if (localCommentError) setLocalCommentError(null);
+                }
+              }}
+              placeholder="Add a comment..."
+              placeholderTextColor="rgba(255,255,255,0.45)"
+              style={s.chatInput}
+              maxLength={MAX_COMMENT_LENGTH}
+              onSubmitEditing={handleSendComment}
+              returnKeyType="send"
+            />
+            <Pressable
+              onPress={handleSendComment}
+              style={[s.sendBtn, !canSendComment ? s.sendBtnDisabled : null]}
+              disabled={!canSendComment}
+            >
+              <Text style={s.sendBtnText}>Send</Text>
+            </Pressable>
           </View>
-        )}
+          <Text style={s.charCounter}>
+            {commentText.length}/{MAX_COMMENT_LENGTH}
+          </Text>
 
-        {/* Connection error */}
-        {connectionError && (
-          <View style={s.errorBanner}>
-            <Text style={s.errorText}>{connectionError}</Text>
-          </View>
-        )}
+          {(localCommentError || commentError) && (
+            <View style={s.commentErrorRow}>
+              <Text style={s.commentErrorText}>
+                {localCommentError ?? commentError}
+              </Text>
+            </View>
+          )}
 
-        {/* Loading state */}
-        {!auctionState && connected && (
-          <Text style={s.mutedText}>Loading auction…</Text>
-        )}
+          {/* Agora error */}
+          {agoraError && (
+            <View style={s.errorBanner}>
+              <Text style={s.errorText}>{agoraError}</Text>
+            </View>
+          )}
 
-        {auctionState && (
-          <>
-            {/* Current item info */}
-            {currentItem && (
-              <View style={s.itemCard}>
-                <View style={s.itemHeader}>
-                  <Text style={s.itemName}>{currentItem.name}</Text>
-                  {remainingSec !== null && isLive && (
-                    <View style={s.timerBadge}>
-                      <Text style={s.timerText}>{remainingSec}s</Text>
-                    </View>
+          {/* Connection error */}
+          {connectionError && (
+            <View style={s.errorBanner}>
+              <Text style={s.errorText}>{connectionError}</Text>
+            </View>
+          )}
+
+          {/* Loading state */}
+          {!auctionState && connected && (
+            <Text style={s.mutedText}>Loading auction…</Text>
+          )}
+
+          {auctionState && (
+            <>
+              {/* Current item info */}
+              {currentItem && (
+                <View style={s.itemCard}>
+                  <View style={s.itemHeader}>
+                    <Text style={s.itemName}>{currentItem.name}</Text>
+                    {remainingSec !== null && isLive && (
+                      <View style={s.timerBadge}>
+                        <Text style={s.timerText}>{remainingSec}s</Text>
+                      </View>
+                    )}
+                  </View>
+                  <View style={s.priceRow}>
+                    <Text style={s.priceLabel}>Current bid</Text>
+                    <Text style={s.priceValue}>${currentItem.highestBid}</Text>
+                  </View>
+                  {currentItem.highestBidderId && (
+                    <Text style={s.bidderText}>
+                      by {currentItem.highestBidderId}
+                    </Text>
                   )}
                 </View>
-                <View style={s.priceRow}>
-                  <Text style={s.priceLabel}>Current bid</Text>
-                  <Text style={s.priceValue}>${currentItem.highestBid}</Text>
-                </View>
-                {currentItem.highestBidderId && (
-                  <Text style={s.bidderText}>
-                    by {currentItem.highestBidderId}
+              )}
+
+              {/* Bid result toast */}
+              {bidResult && (
+                <View
+                  style={[
+                    s.toast,
+                    {
+                      backgroundColor: bidResult.accepted
+                        ? "rgba(34,229,139,0.2)"
+                        : "rgba(255,77,77,0.2)",
+                      borderColor: bidResult.accepted ? "#22E58B" : "#FF4D4D",
+                    },
+                  ]}
+                >
+                  <Text
+                    style={{
+                      color: bidResult.accepted ? "#22E58B" : "#FF4D4D",
+                      fontWeight: "600",
+                      fontSize: 14,
+                    }}
+                  >
+                    {bidResult.accepted ? "Bid accepted!" : bidResult.reason}
                   </Text>
-                )}
-              </View>
-            )}
+                </View>
+              )}
 
-            {/* Bid result toast */}
-            {bidResult && (
-              <View
-                style={[
-                  s.toast,
-                  {
-                    backgroundColor: bidResult.accepted
-                      ? "rgba(34,229,139,0.2)"
-                      : "rgba(255,77,77,0.2)",
-                    borderColor: bidResult.accepted ? "#22E58B" : "#FF4D4D",
-                  },
-                ]}
-              >
-                <Text
-                  style={{
-                    color: bidResult.accepted ? "#22E58B" : "#FF4D4D",
-                    fontWeight: "600",
-                    fontSize: 14,
-                  }}
-                >
-                  {bidResult.accepted ? "Bid accepted!" : bidResult.reason}
-                </Text>
-              </View>
-            )}
-
-            {/* Seller: Start auction */}
-            {isSeller && auctionState.status === "CREATED" && (
-              <Pressable
-                onPress={handleStart}
-                disabled={starting}
-                style={s.startBtn}
-              >
-                <Text style={s.startBtnText}>
-                  {starting ? "Starting…" : "Start auction"}
-                </Text>
-              </Pressable>
-            )}
-
-            {/* Seller: Extend */}
-            {isSeller &&
-              isLive &&
-              currentItem?.status === "LIVE" &&
-              !currentItem.extended && (
+              {/* Seller: Start auction */}
+              {isSeller && auctionState.status === "CREATED" && (
                 <Pressable
-                  onPress={handleExtend}
-                  disabled={extending}
-                  style={s.extendBtn}
+                  onPress={handleStart}
+                  disabled={starting}
+                  style={s.startBtn}
                 >
-                  <Text style={s.extendBtnText}>
-                    {extending ? "Extending…" : "+15s"}
+                  <Text style={s.startBtnText}>
+                    {starting ? "Starting…" : "Start auction"}
                   </Text>
                 </Pressable>
               )}
 
-            {/* Bid button */}
-            {canBid && !isSeller && (
-              <Pressable
-                onPress={() => placeBid(userId, nextBid)}
-                style={s.bidBtn}
-              >
-                <Text style={s.bidBtnText}>Bid ${nextBid}</Text>
-              </Pressable>
-            )}
+              {/* Seller: Extend */}
+              {isSeller &&
+                isLive &&
+                currentItem?.status === "LIVE" &&
+                !currentItem.extended && (
+                  <Pressable
+                    onPress={handleExtend}
+                    disabled={extending}
+                    style={s.extendBtn}
+                  >
+                    <Text style={s.extendBtnText}>
+                      {extending ? "Extending…" : "+15s"}
+                    </Text>
+                  </Pressable>
+                )}
 
-            {/* Auction not started / ended */}
-            {!canBid && !isSeller && (
-              <View style={s.statusMsg}>
-                <Text style={s.mutedText}>
-                  {auctionState.status === "CREATED"
-                    ? "Waiting for seller to start…"
-                    : auctionState.status === "ENDED"
-                      ? "Auction ended"
-                      : "Cannot bid right now"}
-                </Text>
-              </View>
-            )}
-          </>
-        )}
+              {/* Bid button */}
+              {canBid && !isSeller && (
+                <Pressable
+                  onPress={() => placeBid(userId, nextBid)}
+                  style={s.bidBtn}
+                >
+                  <Text style={s.bidBtnText}>Bid ${nextBid}</Text>
+                </Pressable>
+              )}
 
-        {/* Seller label */}
-        {auctionState && (
-          <Text style={s.sellerLabel}>
-            @
-            {isSeller
-              ? (user?.displayName ?? "You")
-              : auctionState.sellerId.slice(0, 8)}
-          </Text>
-        )}
-      </View>
+              {/* Auction not started / ended */}
+              {!canBid && !isSeller && (
+                <View style={s.statusMsg}>
+                  <Text style={s.mutedText}>
+                    {auctionState.status === "CREATED"
+                      ? "Waiting for seller to start…"
+                      : auctionState.status === "ENDED"
+                        ? "Auction ended"
+                        : "Cannot bid right now"}
+                  </Text>
+                </View>
+              )}
+            </>
+          )}
+
+          {/* Seller label */}
+          {auctionState && (
+            <Text style={s.sellerLabel}>
+              @
+              {isSeller
+                ? (user?.displayName ?? "You")
+                : auctionState.sellerId.slice(0, 8)}
+            </Text>
+          )}
+        </View>
+      </KeyboardAvoidingView>
     </View>
   );
 }
@@ -526,16 +654,140 @@ const s = StyleSheet.create({
     height: 10,
     borderRadius: 5,
   },
-
-  /* ── bottom overlay ── */
-  bottomOverlay: {
+  topScrim: {
     position: "absolute",
-    bottom: 0,
     left: 0,
     right: 0,
+    top: 0,
+    height: 140,
+    backgroundColor: "rgba(0,0,0,0.28)",
+  },
+  bottomScrim: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: 260,
+    backgroundColor: "rgba(0,0,0,0.34)",
+  },
+
+  /* ── chat overlay ── */
+  chatOverlay: {
+    position: "absolute",
+    left: 16,
+    width: "72%",
+    zIndex: 11,
+    gap: 8,
+  },
+  chatOverlayHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    backgroundColor: "rgba(0,0,0,0.45)",
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    gap: 8,
+  },
+  chatOverlayTitle: {
+    color: "rgba(255,255,255,0.8)",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  chatOverlayCount: {
+    color: "#fff",
+    fontSize: 12,
+    fontWeight: "800",
+  },
+  commentBubble: {
+    alignSelf: "flex-start",
+    backgroundColor: "rgba(0,0,0,0.55)",
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    maxWidth: "100%",
+  },
+  commentBubbleMine: {
+    backgroundColor: "rgba(124,92,255,0.45)",
+  },
+  commentAuthor: {
+    color: "#B8A9FF",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  commentMetaRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 2,
+    gap: 12,
+  },
+  commentAge: {
+    color: "rgba(255,255,255,0.55)",
+    fontSize: 11,
+    fontWeight: "600",
+  },
+  commentText: {
+    color: "#fff",
+    fontSize: 13,
+    fontWeight: "500",
+  },
+
+  /* ── bottom overlay ── */
+  bottomOverlayWrap: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 10,
+  },
+  bottomOverlay: {
     paddingHorizontal: 16,
     paddingTop: 12,
-    zIndex: 10,
+  },
+  chatComposer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 10,
+  },
+  chatInput: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.16)",
+    color: "#fff",
+    borderRadius: 18,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    fontSize: 14,
+  },
+  sendBtn: {
+    backgroundColor: "rgba(124,92,255,0.9)",
+    borderRadius: 18,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  sendBtnDisabled: {
+    opacity: 0.5,
+  },
+  sendBtnText: {
+    color: "#fff",
+    fontSize: 13,
+    fontWeight: "800",
+  },
+  charCounter: {
+    color: "rgba(255,255,255,0.55)",
+    fontSize: 11,
+    textAlign: "right",
+    marginBottom: 10,
+  },
+  commentErrorRow: {
+    marginBottom: 8,
+  },
+  commentErrorText: {
+    color: "#FF8A8A",
+    fontSize: 12,
   },
 
   /* ── item card ── */

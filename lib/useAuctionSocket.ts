@@ -6,6 +6,9 @@ import type {
   BidResult,
   ItemSoldPayload,
   AuctionEndedPayload,
+  ChatComment,
+  SendCommentPayload,
+  CommentRejectedPayload,
 } from "./auctionSocket";
 
 const DEFAULT_STATE: AuctionState | null = null;
@@ -23,6 +26,8 @@ export function useAuctionSocket(auctionId: string | null) {
   );
   const [lastAuctionEnded, setLastAuctionEnded] =
     useState<AuctionEndedPayload | null>(null);
+  const [comments, setComments] = useState<ChatComment[]>([]);
+  const [commentError, setCommentError] = useState<string | null>(null);
 
   useEffect(() => {
     const s = getAuctionSocket();
@@ -46,6 +51,14 @@ export function useAuctionSocket(auctionId: string | null) {
     const onItemSold = (payload: ItemSoldPayload) => setLastItemSold(payload);
     const onAuctionEnded = (payload: AuctionEndedPayload) =>
       setLastAuctionEnded(payload);
+    const onCommentsSnapshot = (snapshot: ChatComment[]) =>
+      setComments(Array.isArray(snapshot) ? snapshot : []);
+    const onCommentAdded = (comment: ChatComment) => {
+      setComments((prev) => [...prev.slice(-79), comment]);
+      setCommentError(null);
+    };
+    const onCommentRejected = (payload: CommentRejectedPayload) =>
+      setCommentError(payload?.reason ?? "Message rejected");
 
     s.on("connect", onConnect);
     s.on("disconnect", onDisconnect);
@@ -54,6 +67,9 @@ export function useAuctionSocket(auctionId: string | null) {
     s.on("bid_result", onBidResult);
     s.on("item_sold", onItemSold);
     s.on("auction_ended", onAuctionEnded);
+    s.on("comments_snapshot", onCommentsSnapshot);
+    s.on("comment_added", onCommentAdded);
+    s.on("comment_rejected", onCommentRejected);
 
     if (s.connected) setConnected(true);
 
@@ -65,6 +81,9 @@ export function useAuctionSocket(auctionId: string | null) {
       s.off("bid_result", onBidResult);
       s.off("item_sold", onItemSold);
       s.off("auction_ended", onAuctionEnded);
+      s.off("comments_snapshot", onCommentsSnapshot);
+      s.off("comment_added", onCommentAdded);
+      s.off("comment_rejected", onCommentRejected);
     };
   }, []);
 
@@ -72,6 +91,8 @@ export function useAuctionSocket(auctionId: string | null) {
     if (!auctionId) {
       setAuctionState(DEFAULT_STATE);
       setBidResult(null);
+      setComments([]);
+      setCommentError(null);
       return;
     }
     const s = socketRef.current;
@@ -91,12 +112,29 @@ export function useAuctionSocket(auctionId: string | null) {
     [auctionId],
   );
 
+  const sendComment = useCallback(
+    (payload: Omit<SendCommentPayload, "auctionId">) => {
+      if (!auctionId) return;
+      setCommentError(null);
+      socketRef.current?.emit("send_comment", {
+        auctionId,
+        userId: payload.userId,
+        displayName: payload.displayName,
+        text: payload.text,
+      } satisfies SendCommentPayload);
+    },
+    [auctionId],
+  );
+
   return {
     auctionState,
     bidResult,
     connected,
     connectionError,
     placeBid,
+    comments,
+    sendComment,
+    commentError,
     lastItemSold,
     lastAuctionEnded,
   };

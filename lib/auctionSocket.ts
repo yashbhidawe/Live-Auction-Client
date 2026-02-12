@@ -23,6 +23,26 @@ export interface AuctionEndedPayload {
   }>;
 }
 
+export interface ChatComment {
+  id: string;
+  auctionId: string;
+  userId: string;
+  displayName: string;
+  text: string;
+  createdAt: number;
+}
+
+export interface SendCommentPayload {
+  auctionId: string;
+  userId: string;
+  displayName: string;
+  text: string;
+}
+
+export interface CommentRejectedPayload {
+  reason: string;
+}
+
 let socket: Socket | null = null;
 
 export function getAuctionSocket(): Socket {
