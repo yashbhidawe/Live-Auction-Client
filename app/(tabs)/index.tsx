@@ -149,12 +149,22 @@ export default function HomeScreen() {
               {user ? user.displayName : "Live Auctions"}
             </Text>
           </View>
-          <Pressable
-            onPress={() => signOut()}
-            className="rounded-xl bg-surface px-3 py-2 active:opacity-80"
-          >
-            <Text className="text-muted text-xs font-semibold">Sign out</Text>
-          </Pressable>
+          <View className="flex-row items-center gap-2">
+            <Pressable
+              onPress={() => router.push("../profile")}
+              className="rounded-xl bg-surface px-3 py-2 active:opacity-80"
+            >
+              <Text className="text-muted text-xs font-semibold">
+                Edit profile
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={() => signOut()}
+              className="rounded-xl bg-surface px-3 py-2 active:opacity-80"
+            >
+              <Text className="text-muted text-xs font-semibold">Sign out</Text>
+            </Pressable>
+          </View>
         </View>
 
         <View className="mt-4 flex-row items-center gap-2">

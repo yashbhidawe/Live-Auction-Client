@@ -11,6 +11,10 @@ export function setTokenProvider(fn: () => Promise<string | null>) {
   tokenProvider = fn;
 }
 
+export async function getAuthToken(): Promise<string | null> {
+  return tokenProvider ? tokenProvider() : null;
+}
+
 type RequestOptions = Omit<RequestInit, "body"> & {
   body?: object;
 };
@@ -87,6 +91,10 @@ export const userApi = {
     api.post<{ id: string; displayName: string }>("/users", { displayName }),
   sync: (displayName?: string) =>
     api.post<{ id: string; displayName: string }>("/users/sync", {
+      displayName,
+    }),
+  updateMe: (displayName: string) =>
+    api.patch<{ id: string; displayName: string }>("/users/me", {
       displayName,
     }),
   getUser: (id: string) =>

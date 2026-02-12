@@ -1,5 +1,6 @@
 import { io, Socket } from "socket.io-client";
 import { env } from "@/constants/env";
+import { getAuthToken } from "@/lib/api";
 import type { AuctionState } from "@/types/auction";
 
 export type { AuctionState };
@@ -47,7 +48,13 @@ let socket: Socket | null = null;
 
 export function getAuctionSocket(): Socket {
   if (!socket) {
-    socket = io(env.socketUrl, { autoConnect: true });
+    socket = io(env.socketUrl, {
+      autoConnect: true,
+      auth: async (cb) => {
+        const token = await getAuthToken();
+        cb(token ? { token } : {});
+      },
+    });
   }
   return socket;
 }

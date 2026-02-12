@@ -58,6 +58,15 @@ function formatCommentAge(createdAt: number) {
   return `${hr}h`;
 }
 
+function formatParticipantLabel(
+  participantId: string,
+  currentUserId: string,
+  currentDisplayName?: string,
+) {
+  if (participantId === currentUserId) return currentDisplayName ?? "You";
+  return participantId.slice(0, 8);
+}
+
 /* ═══════════════════════════════════════════════════════════════════════════ */
 
 export default function AuctionWatchScreen() {
@@ -350,7 +359,12 @@ export default function AuctionWatchScreen() {
             <Text style={s.winnerPrice}>${winnerAnnouncement.finalPrice}</Text>
             {winnerAnnouncement.winnerId ? (
               <Text style={s.winnerName}>
-                Won by {winnerAnnouncement.winnerId}
+                Won by{" "}
+                {formatParticipantLabel(
+                  winnerAnnouncement.winnerId,
+                  userId,
+                  user?.displayName,
+                )}
               </Text>
             ) : (
               <Text style={s.winnerNoBids}>No bids</Text>
@@ -521,7 +535,12 @@ export default function AuctionWatchScreen() {
                         <Text style={s.resultName}>{result.name}</Text>
                         {result.winnerId ? (
                           <Text style={s.resultWinner}>
-                            Won by {result.winnerId}
+                            Won by{" "}
+                            {formatParticipantLabel(
+                              result.winnerId,
+                              userId,
+                              user?.displayName,
+                            )}
                           </Text>
                         ) : (
                           <Text style={s.resultNoWinner}>No bids</Text>
@@ -552,7 +571,12 @@ export default function AuctionWatchScreen() {
                       </View>
                       {currentItem.highestBidderId && (
                         <Text style={s.bidderText}>
-                          by {currentItem.highestBidderId}
+                          by{" "}
+                          {formatParticipantLabel(
+                            currentItem.highestBidderId,
+                            userId,
+                            user?.displayName,
+                          )}
                         </Text>
                       )}
                     </View>

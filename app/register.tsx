@@ -27,6 +27,7 @@ export default function RegisterScreen() {
   const [mode, setMode] = useState<"sign-in" | "sign-up">("sign-in");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [displayName, setDisplayName] = useState("");
   const [code, setCode] = useState("");
   const [pendingVerification, setPendingVerification] = useState(false);
   const [showEmailCode, setShowEmailCode] = useState(false);
@@ -37,14 +38,23 @@ export default function RegisterScreen() {
   const onSignUpPress = useCallback(async () => {
     if (!signUpLoaded || !signUp) return;
     const trimmed = email.trim();
+    const trimmedDisplayName = displayName.trim();
+    if (!trimmedDisplayName) {
+      setError("Display name required");
+      return;
+    }
     if (!trimmed || !password) {
-      setError("Email and password required");
+      setError("Display name, email, and password are required");
       return;
     }
     setError(null);
     setLoading(true);
     try {
-      await signUp.create({ emailAddress: trimmed, password });
+      await signUp.create({
+        emailAddress: trimmed,
+        password,
+        unsafeMetadata: { displayName: trimmedDisplayName },
+      });
       await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
       setPendingVerification(true);
     } catch (err: unknown) {
@@ -56,7 +66,7 @@ export default function RegisterScreen() {
     } finally {
       setLoading(false);
     }
-  }, [signUp, signUpLoaded, email, password]);
+  }, [signUp, signUpLoaded, email, password, displayName]);
 
   const onVerifySignUp = useCallback(async () => {
     if (!signUpLoaded || !signUp || !setActiveSignUp) return;
@@ -214,6 +224,16 @@ export default function RegisterScreen() {
         </View>
 
         <View>
+          {mode === "sign-up" && (
+            <TextInput
+              className="rounded-xl border border-surface bg-surface px-5 py-4 text-foreground text-lg mb-4"
+              placeholder="Display name"
+              placeholderTextColor="#A1A1B3"
+              value={displayName}
+              onChangeText={setDisplayName}
+              editable={!loading}
+            />
+          )}
           <TextInput
             className="rounded-xl border border-surface bg-surface px-5 py-4 text-foreground text-lg"
             placeholder="Email"

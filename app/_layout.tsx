@@ -8,7 +8,7 @@ import "react-native-reanimated";
 
 import "../global.css";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { ClerkProvider, useAuth } from "@clerk/clerk-expo";
+import { ClerkProvider, useAuth, useUser } from "@clerk/clerk-expo";
 import { tokenCache } from "@clerk/clerk-expo/token-cache";
 import { env } from "@/constants/env";
 import { setTokenProvider, userApi } from "@/lib/api";
@@ -22,6 +22,7 @@ export const unstable_settings = {
 
 function AuthSync() {
   const { isLoaded, isSignedIn, getToken } = useAuth();
+  const { user } = useUser();
   const { setUser, logout, setSyncError, setSyncLoading, _retrySyncTrigger } =
     useAuctionStore();
 
@@ -55,8 +56,19 @@ function AuthSync() {
       )
       .catch(() => console.warn("[AuthSync] Failed to read token"));
 
+    const metadataDisplayName = (
+      user?.unsafeMetadata?.displayName as string | undefined
+    )
+      ?.trim()
+      .slice(0, 64);
+    const fallbackDisplayName =
+      [user?.firstName, user?.lastName].filter(Boolean).join(" ").trim() ||
+      user?.username?.trim() ||
+      user?.primaryEmailAddress?.emailAddress?.split("@")[0]?.trim();
+    const preferredDisplayName = metadataDisplayName || fallbackDisplayName;
+
     userApi
-      .sync()
+      .sync(preferredDisplayName)
       .then((user) => {
         if (!cancelled) {
           console.log(
@@ -85,6 +97,7 @@ function AuthSync() {
     isLoaded,
     isSignedIn,
     _retrySyncTrigger,
+    user,
     setUser,
     logout,
     setSyncError,
