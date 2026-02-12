@@ -167,6 +167,7 @@ export default function AuctionWatchScreen() {
     itemName: string;
     winnerId: string | null;
     finalPrice: number;
+    sold: boolean;
   } | null>(null);
   const announcementOpacity = useRef(new Animated.Value(0)).current;
   const announcementTranslateY = useRef(new Animated.Value(-40)).current;
@@ -174,15 +175,17 @@ export default function AuctionWatchScreen() {
 
   useEffect(() => {
     if (!lastItemSold) return;
-    // Look up the item name from auctionState
+    // Look up the item name by id (state may already have SOLD/UNSOLD for this item)
     const item = auctionState?.items?.find(
-      (it) => it.name && it.status === "SOLD",
+      (it) => it.id === lastItemSold.itemId,
     );
     const itemName = item?.name ?? `Item`;
+    const sold = lastItemSold.sold ?? !!lastItemSold.winnerId;
     setWinnerAnnouncement({
       itemName,
       winnerId: lastItemSold.winnerId,
       finalPrice: lastItemSold.finalPrice,
+      sold,
     });
     // Animate in
     announcementOpacity.setValue(0);
@@ -211,7 +214,7 @@ export default function AuctionWatchScreen() {
     return () => {
       if (announcementTimer.current) clearTimeout(announcementTimer.current);
     };
-  }, [lastItemSold]);
+  }, [lastItemSold, auctionState?.items]);
 
   /* ── actions ── */
   const [starting, setStarting] = useState(false);
@@ -351,21 +354,33 @@ export default function AuctionWatchScreen() {
           pointerEvents="none"
         >
           <View style={s.winnerCard}>
-            <Text style={s.winnerEmoji}>🏆</Text>
-            <Text style={s.winnerTitle}>SOLD!</Text>
+            <Text style={s.winnerEmoji}>
+              {winnerAnnouncement.sold ? "🏆" : "—"}
+            </Text>
+            <Text style={s.winnerTitle}>
+              {winnerAnnouncement.sold ? "SOLD!" : "UNSOLD"}
+            </Text>
             <Text style={s.winnerItem}>{winnerAnnouncement.itemName}</Text>
-            <Text style={s.winnerPrice}>${winnerAnnouncement.finalPrice}</Text>
-            {winnerAnnouncement.winnerId ? (
-              <Text style={s.winnerName}>
-                Won by{" "}
-                {formatParticipantLabel(
-                  winnerAnnouncement.winnerId,
-                  userId,
-                  user?.displayName,
+            {winnerAnnouncement.sold ? (
+              <>
+                <Text style={s.winnerPrice}>
+                  ${winnerAnnouncement.finalPrice}
+                </Text>
+                {winnerAnnouncement.winnerId ? (
+                  <Text style={s.winnerName}>
+                    Won by{" "}
+                    {formatParticipantLabel(
+                      winnerAnnouncement.winnerId,
+                      userId,
+                      user?.displayName,
+                    )}
+                  </Text>
+                ) : (
+                  <Text style={s.winnerNoBids}>No bids</Text>
                 )}
-              </Text>
+              </>
             ) : (
-              <Text style={s.winnerNoBids}>No bids</Text>
+              <Text style={s.winnerNoBids}>No bids — passed</Text>
             )}
           </View>
         </Animated.View>

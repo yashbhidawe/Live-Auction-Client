@@ -13,6 +13,8 @@ export interface ItemSoldPayload {
   itemId: string;
   winnerId: string | null;
   finalPrice: number;
+  /** true when item had bids and was sold; false when passed/unsold */
+  sold: boolean;
 }
 
 export interface AuctionEndedPayload {
