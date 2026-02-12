@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
   Keyboard,
@@ -95,9 +95,13 @@ export default function AuctionWatchScreen() {
 
   useEffect(() => {
     if (!auctionId || isSeller) return;
+    if (auctionState?.status === "ENDED") {
+      leave();
+      return () => {};
+    }
     join();
     return () => leave();
-  }, [auctionId, isSeller, join, leave]);
+  }, [auctionId, isSeller, auctionState?.status, join, leave]);
 
   useEffect(() => {
     if (!auctionId || !isSeller) return;
@@ -121,6 +125,30 @@ export default function AuctionWatchScreen() {
   const nextBid = currentItem ? currentItem.highestBid + BID_STEP : 0;
   const canBid = auctionState?.status === "LIVE";
   const isLive = auctionState?.status === "LIVE";
+  const isEnded = auctionState?.status === "ENDED";
+  const canUseChat = !isEnded;
+
+  const endedResults = useMemo(() => {
+    if (!auctionState?.items?.length) return [];
+    const hasFinalPayload =
+      lastAuctionEnded && lastAuctionEnded.auctionId === auctionId;
+    const finalByItemId = new Map(
+      (hasFinalPayload ? lastAuctionEnded.results : []).map((result) => [
+        result.itemId,
+        result,
+      ]),
+    );
+
+    return auctionState.items.map((item) => {
+      const final = finalByItemId.get(item.id);
+      return {
+        id: item.id,
+        name: item.name,
+        winnerId: final?.winnerId ?? item.highestBidderId,
+        finalPrice: final?.finalPrice ?? item.highestBid,
+      };
+    });
+  }, [auctionState?.items, lastAuctionEnded, auctionId]);
 
   /* ── winner announcement ── */
   const [winnerAnnouncement, setWinnerAnnouncement] = useState<{
@@ -237,7 +265,10 @@ export default function AuctionWatchScreen() {
 
   const visibleComments = comments.slice(-6);
   const canSendComment =
-    connected && commentText.trim().length > 0 && userId.length > 0;
+    canUseChat &&
+    connected &&
+    commentText.trim().length > 0 &&
+    userId.length > 0;
 
   /* ── invalid auction ── */
   if (!auctionId) {
@@ -274,6 +305,7 @@ export default function AuctionWatchScreen() {
         remoteUid={remoteUid}
         uid={uid}
         channelId={channel}
+        auctionStatus={auctionState?.status}
       />
       <View pointerEvents="none" style={s.topScrim} />
       <View pointerEvents="none" style={s.bottomScrim} />
@@ -343,36 +375,38 @@ export default function AuctionWatchScreen() {
       </View>
 
       {/* ── LAYER 4: Floating stream comments ── */}
-      <View
-        style={[s.chatOverlay, { bottom: insets.bottom + 220 }]}
-        pointerEvents="box-none"
-      >
-        <View style={s.chatOverlayHeader}>
-          <Text style={s.chatOverlayTitle}>Live chat</Text>
-          <Text style={s.chatOverlayCount}>{comments.length}</Text>
-        </View>
-        {visibleComments.map((comment, idx) => {
-          const isMine = comment.userId === userId;
-          return (
-            <View
-              key={comment.id}
-              style={[
-                s.commentBubble,
-                isMine ? s.commentBubbleMine : null,
-                { opacity: 0.45 + (idx + 1) / visibleComments.length / 2 },
-              ]}
-            >
-              <View style={s.commentMetaRow}>
-                <Text style={s.commentAuthor}>{comment.displayName}</Text>
-                <Text style={s.commentAge}>
-                  {formatCommentAge(comment.createdAt)}
-                </Text>
+      {canUseChat && (
+        <View
+          style={[s.chatOverlay, { bottom: insets.bottom + 220 }]}
+          pointerEvents="box-none"
+        >
+          <View style={s.chatOverlayHeader}>
+            <Text style={s.chatOverlayTitle}>Live chat</Text>
+            <Text style={s.chatOverlayCount}>{comments.length}</Text>
+          </View>
+          {visibleComments.map((comment, idx) => {
+            const isMine = comment.userId === userId;
+            return (
+              <View
+                key={comment.id}
+                style={[
+                  s.commentBubble,
+                  isMine ? s.commentBubbleMine : null,
+                  { opacity: 0.45 + (idx + 1) / visibleComments.length / 2 },
+                ]}
+              >
+                <View style={s.commentMetaRow}>
+                  <Text style={s.commentAuthor}>{comment.displayName}</Text>
+                  <Text style={s.commentAge}>
+                    {formatCommentAge(comment.createdAt)}
+                  </Text>
+                </View>
+                <Text style={s.commentText}>{comment.text}</Text>
               </View>
-              <Text style={s.commentText}>{comment.text}</Text>
-            </View>
-          );
-        })}
-      </View>
+            );
+          })}
+        </View>
+      )}
 
       {/* ── LAYER 5: Bottom overlay (item info + bid + seller controls + chat input) ── */}
       <KeyboardAvoidingView
@@ -380,40 +414,44 @@ export default function AuctionWatchScreen() {
         style={s.bottomOverlayWrap}
       >
         <View style={[s.bottomOverlay, { paddingBottom: insets.bottom + 16 }]}>
-          <View style={s.chatComposer}>
-            <TextInput
-              value={commentText}
-              onChangeText={(val) => {
-                if (val.length <= MAX_COMMENT_LENGTH) {
-                  setCommentText(val);
-                  if (localCommentError) setLocalCommentError(null);
-                }
-              }}
-              placeholder="Add a comment..."
-              placeholderTextColor="rgba(255,255,255,0.45)"
-              style={s.chatInput}
-              maxLength={MAX_COMMENT_LENGTH}
-              onSubmitEditing={handleSendComment}
-              returnKeyType="send"
-            />
-            <Pressable
-              onPress={handleSendComment}
-              style={[s.sendBtn, !canSendComment ? s.sendBtnDisabled : null]}
-              disabled={!canSendComment}
-            >
-              <Text style={s.sendBtnText}>Send</Text>
-            </Pressable>
-          </View>
-          <Text style={s.charCounter}>
-            {commentText.length}/{MAX_COMMENT_LENGTH}
-          </Text>
-
-          {(localCommentError || commentError) && (
-            <View style={s.commentErrorRow}>
-              <Text style={s.commentErrorText}>
-                {localCommentError ?? commentError}
+          {canUseChat && (
+            <>
+              <View style={s.chatComposer}>
+                <TextInput
+                  value={commentText}
+                  onChangeText={(val) => {
+                    if (val.length <= MAX_COMMENT_LENGTH) {
+                      setCommentText(val);
+                      if (localCommentError) setLocalCommentError(null);
+                    }
+                  }}
+                  placeholder="Add a comment..."
+                  placeholderTextColor="rgba(255,255,255,0.45)"
+                  style={s.chatInput}
+                  maxLength={MAX_COMMENT_LENGTH}
+                  onSubmitEditing={handleSendComment}
+                  returnKeyType="send"
+                />
+                <Pressable
+                  onPress={handleSendComment}
+                  style={[s.sendBtn, !canSendComment ? s.sendBtnDisabled : null]}
+                  disabled={!canSendComment}
+                >
+                  <Text style={s.sendBtnText}>Send</Text>
+                </Pressable>
+              </View>
+              <Text style={s.charCounter}>
+                {commentText.length}/{MAX_COMMENT_LENGTH}
               </Text>
-            </View>
+
+              {(localCommentError || commentError) && (
+                <View style={s.commentErrorRow}>
+                  <Text style={s.commentErrorText}>
+                    {localCommentError ?? commentError}
+                  </Text>
+                </View>
+              )}
+            </>
           )}
 
           {/* Agora error */}
@@ -437,104 +475,135 @@ export default function AuctionWatchScreen() {
 
           {auctionState && (
             <>
-              {/* Current item info */}
-              {currentItem && (
-                <View style={s.itemCard}>
-                  <View style={s.itemHeader}>
-                    <Text style={s.itemName}>{currentItem.name}</Text>
-                    {remainingSec !== null && isLive && (
-                      <View style={s.timerBadge}>
-                        <Text style={s.timerText}>{remainingSec}s</Text>
+              {isEnded ? (
+                <View style={s.resultsCard}>
+                  <View style={s.resultsHeader}>
+                    <Text style={s.resultsTitle}>Auction ended</Text>
+                    <View style={s.readonlyBadge}>
+                      <Text style={s.readonlyText}>READ ONLY</Text>
+                    </View>
+                  </View>
+                  <Text style={s.resultsSubtitle}>
+                    Final results for each item
+                  </Text>
+                  {endedResults.map((result) => (
+                    <View key={result.id} style={s.resultRow}>
+                      <View style={s.resultLeft}>
+                        <Text style={s.resultName}>{result.name}</Text>
+                        {result.winnerId ? (
+                          <Text style={s.resultWinner}>
+                            Won by {result.winnerId}
+                          </Text>
+                        ) : (
+                          <Text style={s.resultNoWinner}>No bids</Text>
+                        )}
                       </View>
-                    )}
-                  </View>
-                  <View style={s.priceRow}>
-                    <Text style={s.priceLabel}>Current bid</Text>
-                    <Text style={s.priceValue}>${currentItem.highestBid}</Text>
-                  </View>
-                  {currentItem.highestBidderId && (
-                    <Text style={s.bidderText}>
-                      by {currentItem.highestBidderId}
-                    </Text>
+                      <Text style={s.resultPrice}>${result.finalPrice}</Text>
+                    </View>
+                  ))}
+                </View>
+              ) : (
+                <>
+                  {/* Current item info */}
+                  {currentItem && (
+                    <View style={s.itemCard}>
+                      <View style={s.itemHeader}>
+                        <Text style={s.itemName}>{currentItem.name}</Text>
+                        {remainingSec !== null && isLive && (
+                          <View style={s.timerBadge}>
+                            <Text style={s.timerText}>{remainingSec}s</Text>
+                          </View>
+                        )}
+                      </View>
+                      <View style={s.priceRow}>
+                        <Text style={s.priceLabel}>Current bid</Text>
+                        <Text style={s.priceValue}>${currentItem.highestBid}</Text>
+                      </View>
+                      {currentItem.highestBidderId && (
+                        <Text style={s.bidderText}>
+                          by {currentItem.highestBidderId}
+                        </Text>
+                      )}
+                    </View>
                   )}
-                </View>
-              )}
 
-              {/* Bid result toast */}
-              {bidResult && (
-                <View
-                  style={[
-                    s.toast,
-                    {
-                      backgroundColor: bidResult.accepted
-                        ? "rgba(34,229,139,0.2)"
-                        : "rgba(255,77,77,0.2)",
-                      borderColor: bidResult.accepted ? "#22E58B" : "#FF4D4D",
-                    },
-                  ]}
-                >
-                  <Text
-                    style={{
-                      color: bidResult.accepted ? "#22E58B" : "#FF4D4D",
-                      fontWeight: "600",
-                      fontSize: 14,
-                    }}
-                  >
-                    {bidResult.accepted ? "Bid accepted!" : bidResult.reason}
-                  </Text>
-                </View>
-              )}
+                  {/* Bid result toast */}
+                  {bidResult && (
+                    <View
+                      style={[
+                        s.toast,
+                        {
+                          backgroundColor: bidResult.accepted
+                            ? "rgba(34,229,139,0.2)"
+                            : "rgba(255,77,77,0.2)",
+                          borderColor: bidResult.accepted ? "#22E58B" : "#FF4D4D",
+                        },
+                      ]}
+                    >
+                      <Text
+                        style={{
+                          color: bidResult.accepted ? "#22E58B" : "#FF4D4D",
+                          fontWeight: "600",
+                          fontSize: 14,
+                        }}
+                      >
+                        {bidResult.accepted ? "Bid accepted!" : bidResult.reason}
+                      </Text>
+                    </View>
+                  )}
 
-              {/* Seller: Start auction */}
-              {isSeller && auctionState.status === "CREATED" && (
-                <Pressable
-                  onPress={handleStart}
-                  disabled={starting}
-                  style={s.startBtn}
-                >
-                  <Text style={s.startBtnText}>
-                    {starting ? "Starting…" : "Start auction"}
-                  </Text>
-                </Pressable>
-              )}
+                  {/* Seller: Start auction */}
+                  {isSeller && auctionState.status === "CREATED" && (
+                    <Pressable
+                      onPress={handleStart}
+                      disabled={starting}
+                      style={s.startBtn}
+                    >
+                      <Text style={s.startBtnText}>
+                        {starting ? "Starting…" : "Start auction"}
+                      </Text>
+                    </Pressable>
+                  )}
 
-              {/* Seller: Extend */}
-              {isSeller &&
-                isLive &&
-                currentItem?.status === "LIVE" &&
-                !currentItem.extended && (
-                  <Pressable
-                    onPress={handleExtend}
-                    disabled={extending}
-                    style={s.extendBtn}
-                  >
-                    <Text style={s.extendBtnText}>
-                      {extending ? "Extending…" : "+15s"}
-                    </Text>
-                  </Pressable>
-                )}
+                  {/* Seller: Extend */}
+                  {isSeller &&
+                    isLive &&
+                    currentItem?.status === "LIVE" &&
+                    !currentItem.extended && (
+                      <Pressable
+                        onPress={handleExtend}
+                        disabled={extending}
+                        style={s.extendBtn}
+                      >
+                        <Text style={s.extendBtnText}>
+                          {extending ? "Extending…" : "+15s"}
+                        </Text>
+                      </Pressable>
+                    )}
 
-              {/* Bid button */}
-              {canBid && !isSeller && (
-                <Pressable
-                  onPress={() => placeBid(userId, nextBid)}
-                  style={s.bidBtn}
-                >
-                  <Text style={s.bidBtnText}>Bid ${nextBid}</Text>
-                </Pressable>
-              )}
+                  {/* Bid button */}
+                  {canBid && !isSeller && (
+                    <Pressable
+                      onPress={() => placeBid(userId, nextBid)}
+                      style={s.bidBtn}
+                    >
+                      <Text style={s.bidBtnText}>Bid ${nextBid}</Text>
+                    </Pressable>
+                  )}
 
-              {/* Auction not started / ended */}
-              {!canBid && !isSeller && (
-                <View style={s.statusMsg}>
-                  <Text style={s.mutedText}>
-                    {auctionState.status === "CREATED"
-                      ? "Waiting for seller to start…"
-                      : auctionState.status === "ENDED"
-                        ? "Auction ended"
-                        : "Cannot bid right now"}
-                  </Text>
-                </View>
+                  {/* Auction not started / ended */}
+                  {!canBid && !isSeller && (
+                    <View style={s.statusMsg}>
+                      <Text style={s.mutedText}>
+                        {auctionState.status === "CREATED"
+                          ? "Waiting for seller to start…"
+                          : auctionState.status === "ENDED"
+                            ? "Auction ended"
+                            : "Cannot bid right now"}
+                      </Text>
+                    </View>
+                  )}
+                </>
               )}
             </>
           )}
@@ -788,6 +857,74 @@ const s = StyleSheet.create({
   commentErrorText: {
     color: "#FF8A8A",
     fontSize: 12,
+  },
+
+  /* ── ended results ── */
+  resultsCard: {
+    backgroundColor: "rgba(255,255,255,0.1)",
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 12,
+  },
+  resultsHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  resultsTitle: {
+    color: "#fff",
+    fontSize: 18,
+    fontWeight: "800",
+  },
+  readonlyBadge: {
+    backgroundColor: "rgba(255,255,255,0.18)",
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  readonlyText: {
+    color: "#fff",
+    fontSize: 10,
+    fontWeight: "800",
+    letterSpacing: 0.6,
+  },
+  resultsSubtitle: {
+    color: "rgba(255,255,255,0.6)",
+    fontSize: 12,
+    marginTop: 4,
+    marginBottom: 10,
+  },
+  resultRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 10,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255,255,255,0.08)",
+    gap: 10,
+  },
+  resultLeft: {
+    flex: 1,
+  },
+  resultName: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  resultWinner: {
+    color: "rgba(255,255,255,0.72)",
+    fontSize: 12,
+    marginTop: 2,
+  },
+  resultNoWinner: {
+    color: "rgba(255,255,255,0.45)",
+    fontSize: 12,
+    marginTop: 2,
+  },
+  resultPrice: {
+    color: "#22E58B",
+    fontSize: 18,
+    fontWeight: "800",
   },
 
   /* ── item card ── */

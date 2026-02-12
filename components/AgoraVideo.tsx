@@ -1,5 +1,6 @@
 import { Platform, StyleSheet, Text, View } from "react-native";
 import type { AgoraRole } from "@/lib/agora";
+import type { AuctionStatus } from "@/types/auction";
 
 type AgoraVideoProps = {
   role: AgoraRole;
@@ -7,6 +8,7 @@ type AgoraVideoProps = {
   remoteUid: number | null;
   uid: number;
   channelId?: string;
+  auctionStatus?: AuctionStatus;
 };
 
 /**
@@ -20,6 +22,7 @@ export function AgoraVideo({
   remoteUid,
   uid,
   channelId,
+  auctionStatus,
 }: AgoraVideoProps) {
   if (Platform.OS === "web") {
     return (
@@ -27,6 +30,14 @@ export function AgoraVideo({
         <Text style={styles.placeholderText}>
           Live video only in native app
         </Text>
+      </View>
+    );
+  }
+
+  if (auctionStatus === "ENDED") {
+    return (
+      <View style={styles.placeholder}>
+        <Text style={styles.placeholderText}>Auction ended</Text>
       </View>
     );
   }
