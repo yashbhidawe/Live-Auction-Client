@@ -23,6 +23,9 @@ import { useAuctionStore } from "@/store/auctionStore";
 const BID_STEP = 10;
 const MAX_COMMENT_LENGTH = 180;
 const COMMENT_RATE_LIMIT_MS = 800;
+const CHAT_VISIBLE_MS = 2500;
+const CHAT_FADE_MS = 150;
+const CHAT_REMOVE_BUFFER_MS = 0;
 
 /* ───── countdown hook ───── */
 function useItemCountdown(itemEndTimeMs: number | undefined) {
@@ -208,6 +211,7 @@ export default function AuctionWatchScreen() {
   const [localCommentError, setLocalCommentError] = useState<string | null>(
     null,
   );
+  const [chatNowMs, setChatNowMs] = useState(() => Date.now());
   const lastCommentAtRef = useRef(0);
 
   const handleStart = useCallback(async () => {
@@ -236,6 +240,12 @@ export default function AuctionWatchScreen() {
     }
   }, [lastAuctionEnded, auctionId]);
 
+  useEffect(() => {
+    if (!canUseChat) return;
+    const id = setInterval(() => setChatNowMs(Date.now()), 100);
+    return () => clearInterval(id);
+  }, [canUseChat]);
+
   const handleSendComment = useCallback(() => {
     if (!auctionId || !userId) return;
     const text = commentText.trim();
@@ -263,7 +273,17 @@ export default function AuctionWatchScreen() {
     Keyboard.dismiss();
   }, [auctionId, commentText, sendComment, user?.displayName, userId]);
 
-  const visibleComments = comments.slice(-6);
+  const visibleComments = useMemo(
+    () =>
+      comments
+        .filter(
+          (comment) =>
+            chatNowMs - comment.createdAt <
+            CHAT_VISIBLE_MS + CHAT_FADE_MS + CHAT_REMOVE_BUFFER_MS,
+        )
+        .slice(-6),
+    [comments, chatNowMs],
+  );
   const canSendComment =
     canUseChat &&
     connected &&
@@ -386,13 +406,19 @@ export default function AuctionWatchScreen() {
           </View>
           {visibleComments.map((comment, idx) => {
             const isMine = comment.userId === userId;
+            const age = chatNowMs - comment.createdAt;
+            const fadeProgress =
+              age <= CHAT_VISIBLE_MS
+                ? 0
+                : Math.min(1, (age - CHAT_VISIBLE_MS) / CHAT_FADE_MS);
+            const opacity = Math.max(0, 1 - fadeProgress);
             return (
               <View
                 key={comment.id}
                 style={[
                   s.commentBubble,
                   isMine ? s.commentBubbleMine : null,
-                  { opacity: 0.45 + (idx + 1) / visibleComments.length / 2 },
+                  { opacity },
                 ]}
               >
                 <View style={s.commentMetaRow}>
@@ -434,7 +460,10 @@ export default function AuctionWatchScreen() {
                 />
                 <Pressable
                   onPress={handleSendComment}
-                  style={[s.sendBtn, !canSendComment ? s.sendBtnDisabled : null]}
+                  style={[
+                    s.sendBtn,
+                    !canSendComment ? s.sendBtnDisabled : null,
+                  ]}
                   disabled={!canSendComment}
                 >
                   <Text style={s.sendBtnText}>Send</Text>
@@ -517,7 +546,9 @@ export default function AuctionWatchScreen() {
                       </View>
                       <View style={s.priceRow}>
                         <Text style={s.priceLabel}>Current bid</Text>
-                        <Text style={s.priceValue}>${currentItem.highestBid}</Text>
+                        <Text style={s.priceValue}>
+                          ${currentItem.highestBid}
+                        </Text>
                       </View>
                       {currentItem.highestBidderId && (
                         <Text style={s.bidderText}>
@@ -536,7 +567,9 @@ export default function AuctionWatchScreen() {
                           backgroundColor: bidResult.accepted
                             ? "rgba(34,229,139,0.2)"
                             : "rgba(255,77,77,0.2)",
-                          borderColor: bidResult.accepted ? "#22E58B" : "#FF4D4D",
+                          borderColor: bidResult.accepted
+                            ? "#22E58B"
+                            : "#FF4D4D",
                         },
                       ]}
                     >
@@ -547,7 +580,9 @@ export default function AuctionWatchScreen() {
                           fontSize: 14,
                         }}
                       >
-                        {bidResult.accepted ? "Bid accepted!" : bidResult.reason}
+                        {bidResult.accepted
+                          ? "Bid accepted!"
+                          : bidResult.reason}
                       </Text>
                     </View>
                   )}

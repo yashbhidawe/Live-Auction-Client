@@ -1,4 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { useRouter } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
 import { Controller, useFieldArray, useForm } from "react-hook-form";
@@ -39,6 +40,7 @@ const DURATION_PRESETS = [30, 60, 120] as const;
 
 export default function CreateAuctionScreen() {
   const router = useRouter();
+  const tabBarHeight = useBottomTabBarHeight();
   const { addAuction, user, syncError, syncLoading } = useAuctionStore();
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -125,7 +127,8 @@ export default function CreateAuctionScreen() {
 
         <ScrollView
           className="flex-1"
-          contentContainerClassName="p-5 pb-40"
+          contentContainerClassName="p-5"
+          contentContainerStyle={{ paddingBottom: tabBarHeight + 120 }}
           keyboardShouldPersistTaps="handled"
         >
           <View className="flex-row gap-2">
@@ -296,7 +299,10 @@ export default function CreateAuctionScreen() {
           )}
         </ScrollView>
 
-        <View className="border-t border-surface bg-background px-5 py-4">
+        <View
+          className="border-t border-surface bg-background px-5 py-4"
+          style={{ marginBottom: tabBarHeight + 8 }}
+        >
           <Pressable
             onPress={handleSubmit(onSubmit)}
             disabled={loading || !user}
