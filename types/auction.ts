@@ -34,6 +34,8 @@ export interface AuctionListItem {
   sellerId: string;
   status: string;
   sellerName?: string;
+  firstItemName?: string | null;
+  itemCount?: number;
 }
 
 export interface CreateAuctionItemInput {

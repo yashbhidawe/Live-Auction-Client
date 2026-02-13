@@ -78,7 +78,12 @@ export default function HomeScreen() {
 
   const renderItem = useCallback(
     ({ item }: { item: AuctionListItem }) => {
-      const sellerName = item.sellerName ?? `seller-${item.sellerId.slice(0, 6)}`;
+      const itemCount = item.itemCount ?? 0;
+      const cardHeading = item.firstItemName
+        ? itemCount > 1
+          ? `${item.firstItemName} +${itemCount - 1} more`
+          : item.firstItemName
+        : "Auction items";
       const isLive = item.status === "LIVE";
       return (
         <Pressable
@@ -91,7 +96,7 @@ export default function HomeScreen() {
                 Auction {item.id.slice(0, 8)}
               </Text>
               <Text className="mt-1 text-base font-semibold text-foreground">
-                {sellerName}
+                {cardHeading}
               </Text>
             </View>
             <View
@@ -172,7 +177,7 @@ export default function HomeScreen() {
             className={`h-2 w-2 rounded-full ${connected ? "bg-accent" : "bg-muted"}`}
           />
           <Text className="text-muted text-sm">
-            {connected ? "Realtime connected" : "Realtime reconnecting..."}
+            {connected ? "Connected" : "Reconnecting..."}
           </Text>
         </View>
 
