@@ -16,7 +16,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { SlideOverlay } from "@/components/auction/SlideOverlay";
 import { StreamStage } from "@/components/auction/StreamStage";
 import type { AgoraRole } from "@/lib/agora";
-import { auctionApi } from "@/lib/api";
+import { auctionApi, userApi } from "@/lib/api";
 import { useAgora } from "@/lib/useAgora";
 import { useAuctionSocket } from "@/lib/useAuctionSocket";
 import { useAuctionStore } from "@/store/auctionStore";
@@ -63,8 +63,11 @@ function formatParticipantLabel(
   participantId: string,
   currentUserId: string,
   currentDisplayName?: string,
+  nameById?: Record<string, string>,
 ) {
   if (participantId === currentUserId) return currentDisplayName ?? "You";
+  const knownName = nameById?.[participantId];
+  if (knownName) return knownName;
   return participantId.slice(0, 8);
 }
 
@@ -144,6 +147,35 @@ export default function AuctionWatchScreen() {
   const isLive = auctionState?.status === "LIVE";
   const isEnded = auctionState?.status === "ENDED";
   const canUseChat = !isEnded;
+  const [participantNameById, setParticipantNameById] = useState<
+    Record<string, string>
+  >({});
+  const fetchingParticipantIdsRef = useRef(new Set<string>());
+
+  useEffect(() => {
+    if (!userId) return;
+    const fallbackName = user?.displayName ?? "You";
+    setParticipantNameById((prev) => ({
+      ...prev,
+      [userId]: fallbackName,
+    }));
+  }, [userId, user?.displayName]);
+
+  useEffect(() => {
+    if (!comments.length) return;
+    setParticipantNameById((prev) => {
+      const next = { ...prev };
+      let changed = false;
+      comments.forEach((comment) => {
+        if (!comment.userId || !comment.displayName) return;
+        if (next[comment.userId] !== comment.displayName) {
+          next[comment.userId] = comment.displayName;
+          changed = true;
+        }
+      });
+      return changed ? next : prev;
+    });
+  }, [comments]);
 
   const endedResults = useMemo(() => {
     if (!auctionState?.items?.length) return [];
@@ -166,6 +198,57 @@ export default function AuctionWatchScreen() {
       };
     });
   }, [auctionState?.items, lastAuctionEnded, auctionId]);
+
+  const participantIdsToResolve = useMemo(() => {
+    const ids = new Set<string>();
+    if (auctionState?.sellerId) ids.add(auctionState.sellerId);
+    if (currentItem?.highestBidderId) ids.add(currentItem.highestBidderId);
+    endedResults.forEach((result) => {
+      if (result.winnerId) ids.add(result.winnerId);
+    });
+    if (lastItemSold?.winnerId) ids.add(lastItemSold.winnerId);
+
+    return [...ids].filter(
+      (id) =>
+        !!id &&
+        id !== userId &&
+        !participantNameById[id] &&
+        !fetchingParticipantIdsRef.current.has(id),
+    );
+  }, [
+    auctionState?.sellerId,
+    currentItem?.highestBidderId,
+    endedResults,
+    lastItemSold?.winnerId,
+    participantNameById,
+    userId,
+  ]);
+
+  useEffect(() => {
+    if (!participantIdsToResolve.length) return;
+    let cancelled = false;
+
+    participantIdsToResolve.forEach((participantId) => {
+      fetchingParticipantIdsRef.current.add(participantId);
+      userApi
+        .getUser(participantId)
+        .then((resolvedUser) => {
+          if (cancelled || !resolvedUser?.displayName) return;
+          setParticipantNameById((prev) => ({
+            ...prev,
+            [participantId]: resolvedUser.displayName,
+          }));
+        })
+        .catch(() => {})
+        .finally(() => {
+          fetchingParticipantIdsRef.current.delete(participantId);
+        });
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [participantIdsToResolve]);
 
   /* ── winner announcement ── */
   const [winnerAnnouncement, setWinnerAnnouncement] = useState<{
@@ -376,6 +459,7 @@ export default function AuctionWatchScreen() {
                       winnerAnnouncement.winnerId,
                       userId,
                       user?.displayName,
+                      participantNameById,
                     )}
                   </Text>
                 ) : (
@@ -555,6 +639,7 @@ export default function AuctionWatchScreen() {
                               result.winnerId,
                               userId,
                               user?.displayName,
+                              participantNameById,
                             )}
                           </Text>
                         ) : (
@@ -591,6 +676,7 @@ export default function AuctionWatchScreen() {
                             currentItem.highestBidderId,
                             userId,
                             user?.displayName,
+                            participantNameById,
                           )}
                         </Text>
                       )}
@@ -686,9 +772,12 @@ export default function AuctionWatchScreen() {
           {auctionState && (
             <Text style={s.sellerLabel}>
               @
-              {isSeller
-                ? (user?.displayName ?? "You")
-                : auctionState.sellerId.slice(0, 8)}
+              {formatParticipantLabel(
+                auctionState.sellerId,
+                userId,
+                user?.displayName,
+                participantNameById,
+              )}
             </Text>
           )}
           </View>

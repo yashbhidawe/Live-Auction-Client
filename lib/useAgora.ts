@@ -30,7 +30,7 @@ export function useAgora(role: AgoraRole, channelName?: string) {
     leaveChannel: () => number;
     release: (sync?: boolean) => void;
     switchCamera: () => number;
-    setCameraCapturerConfiguration: (config: unknown) => number;
+    setVideoEncoderConfiguration?: (config: unknown) => number;
     [key: string]: unknown;
   } | null>(null);
   const uidRef = useRef(Math.floor(Math.random() * 100000) + 1);
@@ -67,7 +67,11 @@ export function useAgora(role: AgoraRole, channelName?: string) {
       const isRejoin = engine != null;
 
       if (!engine) {
-        const { CameraDirection } = await import("react-native-agora");
+        const {
+          OrientationMode,
+          VideoEncoderConfiguration,
+          VideoDimensions,
+        } = await import("react-native-agora");
         engine = createAgoraRtcEngine();
         const ctx = new RtcEngineContext();
         ctx.appId = appId;
@@ -75,10 +79,14 @@ export function useAgora(role: AgoraRole, channelName?: string) {
         engine.initialize(ctx);
         engine.enableVideo();
         engine.enableAudio();
-        // Default to rear camera
-        engine.setCameraCapturerConfiguration({
-          cameraDirection: CameraDirection.CameraRear,
-        });
+        const encoder = new VideoEncoderConfiguration();
+        const dimensions = new VideoDimensions();
+        dimensions.width = 540;
+        dimensions.height = 960;
+        encoder.dimensions = dimensions;
+        encoder.frameRate = 15;
+        encoder.orientationMode = OrientationMode.OrientationModeAdaptive;
+        engine.setVideoEncoderConfiguration?.(encoder);
         engine.registerEventHandler({
           onJoinChannelSuccess: (_conn: unknown, uid: number) => {
             console.log("[useAgora] joined channel", channel, "uid", uid);

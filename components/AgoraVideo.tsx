@@ -1,4 +1,4 @@
-import { Platform, StyleSheet, Text, View } from "react-native";
+import { Platform, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import type { AgoraRole } from "@/lib/agora";
 import type { AuctionStatus } from "@/types/auction";
 
@@ -24,6 +24,18 @@ export function AgoraVideo({
   channelId,
   auctionStatus,
 }: AgoraVideoProps) {
+  const { width: screenWidth, height: screenHeight } = useWindowDimensions();
+  const videoAspectRatio = 9 / 16;
+  const screenAspectRatio = screenWidth / Math.max(1, screenHeight);
+  const viewportWidth =
+    screenAspectRatio > videoAspectRatio
+      ? screenWidth
+      : screenHeight * videoAspectRatio;
+  const viewportHeight =
+    screenAspectRatio > videoAspectRatio
+      ? screenWidth / videoAspectRatio
+      : screenHeight;
+
   if (Platform.OS === "web") {
     return (
       <View style={styles.placeholder}>
@@ -57,25 +69,37 @@ export function AgoraVideo({
   }
 
   try {
-    const { RtcSurfaceView } = require("react-native-agora");
+    const { RtcSurfaceView, RtcTextureView, RenderModeType } =
+      require("react-native-agora");
+    const fitRenderMode = RenderModeType?.RenderModeFit ?? 2;
+    const Renderer =
+      Platform.OS === "android" && RtcTextureView ? RtcTextureView : RtcSurfaceView;
+    const viewportStyle = {
+      width: viewportWidth,
+      height: viewportHeight,
+    };
 
     if (role === "seller") {
       return (
-        <View style={StyleSheet.absoluteFill}>
-          <RtcSurfaceView canvas={{ uid: 0 }} style={StyleSheet.absoluteFill} />
+        <View style={styles.stage}>
+          <Renderer
+            canvas={{ uid: 0, renderMode: fitRenderMode }}
+            style={viewportStyle}
+          />
         </View>
       );
     }
 
     if (role === "buyer" && remoteUid != null) {
       return (
-        <View style={StyleSheet.absoluteFill}>
-          <RtcSurfaceView
+        <View style={styles.stage}>
+          <Renderer
             canvas={{
               uid: remoteUid,
+              renderMode: fitRenderMode,
               ...(channelId ? { channelId } : {}),
             }}
-            style={StyleSheet.absoluteFill}
+            style={viewportStyle}
           />
         </View>
       );
@@ -101,6 +125,13 @@ export function AgoraVideo({
 }
 
 const styles = StyleSheet.create({
+  stage: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "#0B0B12",
+    justifyContent: "center",
+    alignItems: "center",
+    overflow: "hidden",
+  },
   placeholder: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: "#0B0B12",
