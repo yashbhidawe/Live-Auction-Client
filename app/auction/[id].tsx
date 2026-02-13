@@ -14,6 +14,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { SlideOverlay } from "@/components/auction/SlideOverlay";
+import { SlideToBid } from "@/components/auction/SlideToBid";
 import { StreamStage } from "@/components/auction/StreamStage";
 import type { AgoraRole } from "@/lib/agora";
 import { auctionApi, userApi } from "@/lib/api";
@@ -745,12 +746,12 @@ export default function AuctionWatchScreen() {
 
                   {/* Bid button */}
                   {canBid && !isSeller && (
-                    <Pressable
-                      onPress={() => placeBid(nextBid)}
-                      style={s.bidBtn}
-                    >
-                      <Text style={s.bidBtnText}>Bid ${nextBid}</Text>
-                    </Pressable>
+                    <SlideToBid
+                      amount={nextBid}
+                      disabled={!canBid}
+                      width="70%"
+                      onComplete={placeBid}
+                    />
                   )}
 
                   {/* Auction not started / ended */}
