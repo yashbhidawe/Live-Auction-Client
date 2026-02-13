@@ -3,7 +3,10 @@ import { StatusBar } from "expo-status-bar";
 import * as SplashScreen from "expo-splash-screen";
 import { useEffect } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-import { SafeAreaProvider } from "react-native-safe-area-context";
+import {
+  initialWindowMetrics,
+  SafeAreaProvider,
+} from "react-native-safe-area-context";
 import "react-native-reanimated";
 
 import "../global.css";
@@ -139,7 +142,7 @@ export default function RootLayout() {
     <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache}>
       <ErrorBoundary>
         <GestureHandlerRootView style={{ flex: 1, backgroundColor: "#0B0B12" }}>
-          <SafeAreaProvider>
+          <SafeAreaProvider initialMetrics={initialWindowMetrics}>
             <AuthSync />
             <LayoutContent />
           </SafeAreaProvider>

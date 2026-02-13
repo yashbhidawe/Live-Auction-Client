@@ -1,11 +1,12 @@
 import { Tabs } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { SyncBanner } from "@/components/SyncBanner";
 
 export default function TabsLayout() {
   return (
-    <View style={{ flex: 1 }}>
+    <SafeAreaView style={{ flex: 1 }} edges={["top"]}>
       <SyncBanner />
       <Tabs
         screenOptions={{
@@ -61,6 +62,6 @@ export default function TabsLayout() {
           }}
         />
       </Tabs>
-    </View>
+    </SafeAreaView>
   );
 }
