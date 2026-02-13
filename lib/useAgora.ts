@@ -68,6 +68,7 @@ export function useAgora(role: AgoraRole, channelName?: string) {
 
       if (!engine) {
         const {
+          CameraDirection,
           OrientationMode,
           VideoEncoderConfiguration,
           VideoDimensions,
@@ -87,6 +88,10 @@ export function useAgora(role: AgoraRole, channelName?: string) {
         encoder.frameRate = 15;
         encoder.orientationMode = OrientationMode.OrientationModeAdaptive;
         engine.setVideoEncoderConfiguration?.(encoder);
+        // Default seller preview to rear camera.
+        engine.setCameraCapturerConfiguration?.({
+          cameraDirection: CameraDirection.CameraRear,
+        });
         engine.registerEventHandler({
           onJoinChannelSuccess: (_conn: unknown, uid: number) => {
             console.log("[useAgora] joined channel", channel, "uid", uid);
