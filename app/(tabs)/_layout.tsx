@@ -1,6 +1,6 @@
 import { Tabs } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { View } from "react-native";
+import { BlurView } from "expo-blur";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { SyncBanner } from "@/components/SyncBanner";
 
@@ -11,15 +11,26 @@ export default function TabsLayout() {
       <Tabs
         screenOptions={{
           headerShown: false,
+          tabBarBackground: () => (
+            <BlurView
+              intensity={150}
+              tint="dark"
+              experimentalBlurMethod="dimezisBlurView"
+              style={{ flex: 1, borderRadius: 16 }}
+            />
+          ),
           tabBarStyle: {
             position: "absolute",
             left: 14,
             right: 14,
             bottom: 14,
             borderRadius: 16,
+            overflow: "hidden",
             height: 62,
             paddingTop: 6,
-            backgroundColor: "rgba(21,21,39,0.95)",
+            backgroundColor: "rgba(21,21,39,0.28)",
+            borderWidth: 1,
+            borderColor: "rgba(255,255,255,0.18)",
             borderTopWidth: 0,
           },
           tabBarLabelStyle: { fontSize: 12, fontWeight: "700" },
