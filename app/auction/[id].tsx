@@ -683,34 +683,36 @@ export default function AuctionWatchScreen() {
                     </View>
                   )}
 
-                  {/* Bid result toast */}
-                  {bidResult && (
-                    <View
-                      style={[
-                        s.toast,
-                        {
-                          backgroundColor: bidResult.accepted
-                            ? "rgba(34,229,139,0.2)"
-                            : "rgba(255,77,77,0.2)",
-                          borderColor: bidResult.accepted
-                            ? "#22E58B"
-                            : "#FF4D4D",
-                        },
-                      ]}
-                    >
-                      <Text
-                        style={{
-                          color: bidResult.accepted ? "#22E58B" : "#FF4D4D",
-                          fontWeight: "600",
-                          fontSize: 14,
-                        }}
+                  {/* Bid result toast (fixed slot to avoid layout jump) */}
+                  <View style={s.toastSlot}>
+                    {bidResult && (
+                      <View
+                        style={[
+                          s.toast,
+                          {
+                            backgroundColor: bidResult.accepted
+                              ? "rgba(34,229,139,0.2)"
+                              : "rgba(255,77,77,0.2)",
+                            borderColor: bidResult.accepted
+                              ? "#22E58B"
+                              : "#FF4D4D",
+                          },
+                        ]}
                       >
-                        {bidResult.accepted
-                          ? "Bid accepted!"
-                          : bidResult.reason}
-                      </Text>
-                    </View>
-                  )}
+                        <Text
+                          style={{
+                            color: bidResult.accepted ? "#22E58B" : "#FF4D4D",
+                            fontWeight: "600",
+                            fontSize: 14,
+                          }}
+                        >
+                          {bidResult.accepted
+                            ? "Bid accepted!"
+                            : bidResult.reason}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
 
                   {/* Seller: Start auction */}
                   {isSeller && auctionState.status === "CREATED" && (
@@ -1117,12 +1119,16 @@ const s = StyleSheet.create({
   },
 
   /* ── toast ── */
+  toastSlot: {
+    minHeight: 56,
+    marginBottom: 12,
+    justifyContent: "center",
+  },
   toast: {
     borderWidth: 1,
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 10,
-    marginBottom: 12,
     alignItems: "center",
   },
 
