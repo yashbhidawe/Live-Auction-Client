@@ -31,7 +31,16 @@ async function request<T>(
     ...(rest.headers as Record<string, string>),
   };
 
-  const token = tokenProvider ? await tokenProvider() : null;
+  let token: string | null = null;
+  try {
+    token = tokenProvider ? await tokenProvider() : null;
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    // Clerk can throw during auth-state transitions; treat as no token.
+    if (!msg.toLowerCase().includes("signed out")) {
+      throw err instanceof Error ? err : new Error(String(err));
+    }
+  }
   if (token) headers["Authorization"] = `Bearer ${token}`;
 
   const config: RequestInit = {

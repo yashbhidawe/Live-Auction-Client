@@ -39,7 +39,8 @@ function AuthSync() {
     if (!isLoaded || !isSignedIn) {
       if (!isSignedIn) {
         console.log("[AuthSync] Not signed in, clearing user");
-        logout();
+        logout().catch(() => {});
+        setTokenProvider(async () => null);
       }
       setSyncError(null);
       setSyncLoading(false);
@@ -82,12 +83,21 @@ function AuthSync() {
       })
       .catch((err) => {
         if (!cancelled) {
-          const msg =
-            err instanceof Error
-              ? err.message
-              : "Failed to sync. Check server & network.";
-          console.error(`[AuthSync] Sync FAILED: ${msg}`);
-          setSyncError(msg);
+          const msg = err instanceof Error ? err.message : String(err);
+          const lowered = msg.toLowerCase();
+          const isExpectedTransitionError =
+            lowered.includes("aborted") ||
+            lowered.includes("signed out") ||
+            lowered.includes("cancelled");
+
+          if (isExpectedTransitionError) {
+            console.warn(`[AuthSync] Sync skipped: ${msg}`);
+            return;
+          }
+
+          const safeMsg = msg || "Failed to sync. Check server & network.";
+          console.error(`[AuthSync] Sync FAILED: ${safeMsg}`);
+          setSyncError(safeMsg);
         }
       })
       .finally(() => {

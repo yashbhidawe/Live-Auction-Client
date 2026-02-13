@@ -14,6 +14,15 @@
         "EXPO_PUBLIC_SOCKET_URL": "https://live-auction-server.onrender.com"
       }
     },
+    "simulator": {
+      "ios": {
+        "simulator": true
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://live-auction-server.onrender.com",
+        "EXPO_PUBLIC_SOCKET_URL": "https://live-auction-server.onrender.com"
+      }
+    },
     "production": {
       "env": {
         "EXPO_PUBLIC_API_URL": "https://live-auction-server.onrender.com",
