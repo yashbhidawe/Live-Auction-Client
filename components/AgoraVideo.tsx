@@ -43,9 +43,15 @@ export function AgoraVideo({
   }
 
   if (!joined) {
+    const waitingText =
+      role === "buyer" && auctionStatus === "CREATED"
+        ? "Auction will start soon"
+        : role === "seller" && auctionStatus === "CREATED"
+          ? "Preparing camera preview…"
+          : "Preparing live stream…";
     return (
       <View style={styles.placeholder}>
-        <Text style={styles.placeholderText}>Connecting to stream…</Text>
+        <Text style={styles.placeholderText}>{waitingText}</Text>
       </View>
     );
   }

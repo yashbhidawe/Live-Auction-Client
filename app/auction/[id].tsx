@@ -108,17 +108,21 @@ export default function AuctionWatchScreen() {
 
   useEffect(() => {
     if (!auctionId || isSeller) return;
-    if (auctionState?.status === "ENDED") {
-      leave();
-      return () => {};
+    if (auctionState?.status === "LIVE") {
+      join();
+      return () => leave();
     }
-    join();
-    return () => leave();
+    leave();
+    return () => {};
   }, [auctionId, isSeller, auctionState?.status, join, leave]);
 
   useEffect(() => {
     if (!auctionId || !isSeller) return;
-    if (auctionState?.status === "LIVE") {
+    if (auctionState?.status === "ENDED") {
+      leave();
+      return () => {};
+    }
+    if (auctionState?.status === "CREATED" || auctionState?.status === "LIVE") {
       join();
       return () => leave();
     }
