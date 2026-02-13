@@ -13,7 +13,8 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { AgoraVideo } from "@/components/AgoraVideo";
+import { SlideOverlay } from "@/components/auction/SlideOverlay";
+import { StreamStage } from "@/components/auction/StreamStage";
 import type { AgoraRole } from "@/lib/agora";
 import { auctionApi } from "@/lib/api";
 import { useAgora } from "@/lib/useAgora";
@@ -329,7 +330,7 @@ export default function AuctionWatchScreen() {
       />
 
       {/* ── LAYER 1: Full-screen video background ── */}
-      <AgoraVideo
+      <StreamStage
         role={videoRole}
         joined={joined}
         remoteUid={remoteUid}
@@ -337,8 +338,6 @@ export default function AuctionWatchScreen() {
         channelId={channel}
         auctionStatus={auctionState?.status}
       />
-      <View pointerEvents="none" style={s.topScrim} />
-      <View pointerEvents="none" style={s.bottomScrim} />
 
       {/* ── LAYER 2: Floating winner announcement ── */}
       {winnerAnnouncement && (
@@ -421,54 +420,53 @@ export default function AuctionWatchScreen() {
         </View>
       </View>
 
-      {/* ── LAYER 4: Floating stream comments ── */}
-      {canUseChat && (
-        <View
-          style={[s.chatOverlay, { bottom: insets.bottom + 220 }]}
-          pointerEvents="box-none"
+      {/* ── LAYER 4: Bottom overlay (item info + bid + seller controls + chat) ── */}
+      <SlideOverlay>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
         >
-          <View style={s.chatOverlayHeader}>
-            <Text style={s.chatOverlayTitle}>Live chat</Text>
-            <Text style={s.chatOverlayCount}>{comments.length}</Text>
-          </View>
-          {visibleComments.map((comment, idx) => {
-            const isMine = comment.userId === userId;
-            const age = chatNowMs - comment.createdAt;
-            const fadeProgress =
-              age <= CHAT_VISIBLE_MS
-                ? 0
-                : Math.min(1, (age - CHAT_VISIBLE_MS) / CHAT_FADE_MS);
-            const opacity = Math.max(0, 1 - fadeProgress);
-            return (
-              <View
-                key={comment.id}
-                style={[
-                  s.commentBubble,
-                  isMine ? s.commentBubbleMine : null,
-                  { opacity },
-                ]}
-              >
-                <View style={s.commentMetaRow}>
-                  <Text style={s.commentAuthor}>{comment.displayName}</Text>
-                  <Text style={s.commentAge}>
-                    {formatCommentAge(comment.createdAt)}
-                  </Text>
-                </View>
-                <Text style={s.commentText}>{comment.text}</Text>
-              </View>
-            );
-          })}
-        </View>
-      )}
-
-      {/* ── LAYER 5: Bottom overlay (item info + bid + seller controls + chat input) ── */}
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        style={s.bottomOverlayWrap}
-      >
-        <View style={[s.bottomOverlay, { paddingBottom: insets.bottom + 16 }]}>
+          <View
+            style={[
+              s.bottomOverlay,
+              { paddingBottom: insets.bottom + 16 },
+            ]}
+          >
           {canUseChat && (
             <>
+              <View style={s.chatFeedHeader}>
+                <Text style={s.chatOverlayTitle}>Live chat</Text>
+                <Text style={s.chatOverlayCount}>{comments.length}</Text>
+              </View>
+              <View style={s.chatFeedList}>
+                {visibleComments.map((comment) => {
+                  const isMine = comment.userId === userId;
+                  const age = chatNowMs - comment.createdAt;
+                  const fadeProgress =
+                    age <= CHAT_VISIBLE_MS
+                      ? 0
+                      : Math.min(1, (age - CHAT_VISIBLE_MS) / CHAT_FADE_MS);
+                  const opacity = Math.max(0, 1 - fadeProgress);
+                  return (
+                    <View
+                      key={comment.id}
+                      style={[
+                        s.commentBubble,
+                        isMine ? s.commentBubbleMine : null,
+                        { opacity },
+                      ]}
+                    >
+                      <View style={s.commentMetaRow}>
+                        <Text style={s.commentAuthor}>{comment.displayName}</Text>
+                        <Text style={s.commentAge}>
+                          {formatCommentAge(comment.createdAt)}
+                        </Text>
+                      </View>
+                      <Text style={s.commentText}>{comment.text}</Text>
+                    </View>
+                  );
+                })}
+              </View>
+
               <View style={s.chatComposer}>
                 <TextInput
                   value={commentText}
@@ -689,8 +687,9 @@ export default function AuctionWatchScreen() {
                 : auctionState.sellerId.slice(0, 8)}
             </Text>
           )}
-        </View>
-      </KeyboardAvoidingView>
+          </View>
+        </KeyboardAvoidingView>
+      </SlideOverlay>
     </View>
   );
 }
@@ -795,40 +794,20 @@ const s = StyleSheet.create({
     height: 10,
     borderRadius: 5,
   },
-  topScrim: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    top: 0,
-    height: 140,
-    backgroundColor: "rgba(0,0,0,0.28)",
-  },
-  bottomScrim: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 0,
-    height: 260,
-    backgroundColor: "rgba(0,0,0,0.34)",
-  },
 
-  /* ── chat overlay ── */
-  chatOverlay: {
-    position: "absolute",
-    left: 16,
-    width: "72%",
-    zIndex: 11,
-    gap: 8,
-  },
-  chatOverlayHeader: {
+  /* ── chat ── */
+  chatFeedHeader: {
     flexDirection: "row",
     alignItems: "center",
-    alignSelf: "flex-start",
-    backgroundColor: "rgba(0,0,0,0.45)",
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    justifyContent: "space-between",
+    marginBottom: 8,
+    paddingHorizontal: 2,
     gap: 8,
+  },
+  chatFeedList: {
+    marginBottom: 10,
+    gap: 8,
+    maxHeight: 180,
   },
   chatOverlayTitle: {
     color: "rgba(255,255,255,0.8)",
@@ -875,13 +854,6 @@ const s = StyleSheet.create({
   },
 
   /* ── bottom overlay ── */
-  bottomOverlayWrap: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 10,
-  },
   bottomOverlay: {
     paddingHorizontal: 16,
     paddingTop: 12,
